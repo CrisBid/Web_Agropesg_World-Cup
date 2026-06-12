@@ -287,7 +287,7 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
   try {
     const [data, results] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiFetch(`/fixtures/live?league=${LEAGUE_ID}`) as Promise<any>,
+      apiFetch(`/fixtures?live=${LEAGUE_ID}`) as Promise<any>,
       getResults(),
     ]);
     const knockoutTeams = results.knockoutTeams;
