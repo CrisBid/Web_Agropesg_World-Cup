@@ -160,7 +160,7 @@ export default async function RankingPage() {
             <div className="col-span-2 text-center hidden sm:block">Grupos</div>
             <div className="col-span-2 text-center hidden sm:block">Mata-mata</div>
             <div className="col-span-2 text-center hidden sm:block">Bônus</div>
-            <div className="col-span-6 sm:col-span-3 text-right">Total / Prêmio</div>
+            <div className="col-span-6 sm:col-span-2 text-right">Total / Prêmio</div>
           </div>
 
           {ranking.map((p, i) => {
@@ -202,7 +202,7 @@ export default async function RankingPage() {
                   {p.bonusPts > 0 ? `+${p.bonusPts}` : "—"}
                 </div>
 
-                <div className="col-span-6 sm:col-span-3 text-right">
+                <div className="col-span-6 sm:col-span-2 text-right">
                   <div>
                     <span className="text-2xl font-black" style={{ color: "#1b4332" }}>{p.total}</span>
                     <span className="text-xs ml-1" style={{ color: "#5a5a5a" }}>pts</span>
