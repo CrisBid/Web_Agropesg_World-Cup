@@ -288,15 +288,27 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
   try {
     const [data, results] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiFetch(`/fixtures?live=${LEAGUE_ID}`) as Promise<any>,
+      apiFetch(`/fixtures?live=all`) as Promise<any>,
       getResults(),
     ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const apiData = data as any;
+    if (apiData.errors && Object.keys(apiData.errors).length > 0) {
+      console.error("[live] API error:", apiData.errors);
+      return liveCache?.matches ?? [];
+    }
+
     const knockoutTeams = results.knockoutTeams;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const matches: LiveMatch[] = (data.response ?? []).map((f: any) => mapFixture(f, knockoutTeams));
+    const matches: LiveMatch[] = (apiData.response ?? [])
+      .filter((f: any) => f.league?.id === LEAGUE_ID)
+      .map((f: any) => mapFixture(f, knockoutTeams));
+
     liveCache = { matches, fetchedAt: now };
     return matches;
-  } catch {
+  } catch (err) {
+    console.error("[live] fetch error:", err);
     return liveCache?.matches ?? [];
   }
 }
