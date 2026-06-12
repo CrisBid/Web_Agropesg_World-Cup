@@ -1,4 +1,5 @@
 import { addParticipant, getParticipants, removeParticipant, setParticipantLocked, setParticipantAdmin } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const participants = await getParticipants();
@@ -31,6 +32,20 @@ export async function PATCH(request: Request) {
   if (!id) return Response.json({ error: "ID inválido" }, { status: 400 });
   if ("locked" in body) await setParticipantLocked(String(id), Boolean(body.locked));
   if ("isAdmin" in body) await setParticipantAdmin(String(id), Boolean(body.isAdmin));
+  if ("name" in body || "phone" in body) {
+    const updates: Record<string, string> = {};
+    if ("name" in body) {
+      const name = String(body.name ?? "").trim();
+      if (!name) return Response.json({ error: "Nome inválido" }, { status: 400 });
+      updates.name = name;
+    }
+    if ("phone" in body) {
+      const phone = String(body.phone ?? "").replace(/\D/g, "");
+      if (phone.length < 8) return Response.json({ error: "Telefone inválido" }, { status: 400 });
+      updates.phone = phone;
+    }
+    await prisma.participant.update({ where: { id: String(id) }, data: updates });
+  }
   return Response.json({ ok: true });
 }
 
