@@ -73,7 +73,7 @@ export default function NavLinks({ session }: Props) {
         </Link>
       )}
 
-      {(!session || session.isAdmin) && (
+      {session?.isAdmin && (
         <Link
           href="/admin"
           className={linkClass("/admin")}
