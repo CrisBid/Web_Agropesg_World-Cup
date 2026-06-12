@@ -7,6 +7,38 @@ import LiveRanking from "./LiveRanking";
 
 export const dynamic = "force-dynamic";
 
+// Prêmios por colocação (em centavos para evitar aritmética de ponto flutuante)
+const PRIZES_CENTS = [220000, 80000, 50000, 20000, 10000];
+
+function formatBRL(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// Calcula o prêmio de cada participante considerando empates.
+// Participantes empatados dividem a soma dos prêmios das colocações que ocupam.
+function calcPrizes(ranking: { total: number }[]): (number | null)[] {
+  const prizes: (number | null)[] = new Array(ranking.length).fill(null);
+  let i = 0;
+  while (i < ranking.length) {
+    // Encontrar fim do grupo de empatados
+    let j = i;
+    while (j < ranking.length && ranking[j].total === ranking[i].total) j++;
+
+    // Somar os prêmios das posições i..j-1
+    let sum = 0;
+    for (let k = i; k < j; k++) {
+      if (k < PRIZES_CENTS.length) sum += PRIZES_CENTS[k];
+    }
+
+    if (sum > 0) {
+      const share = Math.round(sum / (j - i));
+      for (let k = i; k < j; k++) prizes[k] = share;
+    }
+    i = j;
+  }
+  return prizes;
+}
+
 export default async function RankingPage() {
   const [participants, results] = await Promise.all([getParticipants(), getResults()]);
 
@@ -35,8 +67,16 @@ export default async function RankingPage() {
   );
   ranking.sort((a, b) => b.total - a.total);
 
+  const prizes = calcPrizes(ranking);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
   const MEDAL = ["🥇", "🥈", "🥉"];
+
+  // Detectar empates na zona de prêmios
+  function isTied(i: number): boolean {
+    if (i >= PRIZES_CENTS.length) return false;
+    const total = ranking[i].total;
+    return ranking.filter((p) => p.total === total).length > 1;
+  }
 
   return (
     <div className="space-y-8">
@@ -59,7 +99,49 @@ export default async function RankingPage() {
         </Link>
       </div>
 
-      {/* Live ranking replaces static when active */}
+      {/* Tabela de prêmios */}
+      <div className="rounded-[20px] border p-5" style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
+        <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-4" style={{ color: "#5a5a5a" }}>
+          Premiação
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {PRIZES_CENTS.map((v, i) => (
+            <div key={i}
+              className="flex items-center gap-2.5 rounded-[12px] px-4 py-2.5 border"
+              style={{
+                backgroundColor: i === 0 ? "rgba(201,168,76,0.08)" : "rgba(27,67,50,0.03)",
+                borderColor: i === 0 ? "rgba(201,168,76,0.30)" : "rgba(27,67,50,0.08)",
+              }}>
+              <span className="text-lg">{["🥇","🥈","🥉","4️⃣","5️⃣"][i]}</span>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#5a5a5a" }}>
+                  {i + 1}º lugar
+                </p>
+                <p className="text-sm font-black" style={{ color: i === 0 ? "#8b7028" : "#1b4332" }}>
+                  {formatBRL(v)}
+                </p>
+              </div>
+            </div>
+          ))}
+          <div className="flex items-center gap-2.5 rounded-[12px] px-4 py-2.5 border"
+            style={{ backgroundColor: "rgba(82,183,136,0.06)", borderColor: "rgba(82,183,136,0.20)" }}>
+            <span className="text-lg">💰</span>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#5a5a5a" }}>
+                Total
+              </p>
+              <p className="text-sm font-black" style={{ color: "#1b4332" }}>
+                {formatBRL(PRIZES_CENTS.reduce((s, v) => s + v, 0))}
+              </p>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs mt-3" style={{ color: "#9a9a9a" }}>
+          Em caso de empate, o prêmio das colocações é dividido igualmente entre os empatados.
+        </p>
+      </div>
+
+      {/* Live ranking */}
       <LiveRanking baseRanking={ranking.map((p) => ({ id: p.id, name: p.name, total: p.total }))} />
 
       {ranking.length === 0 ? (
@@ -74,53 +156,73 @@ export default async function RankingPage() {
           <div className="grid grid-cols-12 gap-2 px-5 text-xs font-semibold uppercase tracking-wide"
             style={{ color: "#5a5a5a" }}>
             <div className="col-span-1">#</div>
-            <div className="col-span-4 sm:col-span-3">Participante</div>
+            <div className="col-span-5 sm:col-span-3">Participante</div>
             <div className="col-span-2 text-center hidden sm:block">Grupos</div>
             <div className="col-span-2 text-center hidden sm:block">Mata-mata</div>
             <div className="col-span-2 text-center hidden sm:block">Bônus</div>
-            <div className="col-span-7 sm:col-span-2 text-right font-bold">Total</div>
+            <div className="col-span-6 sm:col-span-3 text-right">Total / Prêmio</div>
           </div>
 
-          {ranking.map((p, i) => (
-            <Link key={p.id} href={`/palpites/${p.id}`}
-              className="grid grid-cols-12 gap-2 items-center rounded-[16px] border px-5 py-4 transition-all hover:shadow-md hover:-translate-y-0.5"
-              style={{
-                backgroundColor: i === 0 ? "rgba(201,168,76,0.06)" : "white",
-                borderColor: i === 0 ? "rgba(201,168,76,0.35)"
-                  : i === 1 ? "rgba(160,160,170,0.25)"
-                  : i === 2 ? "rgba(180,120,60,0.20)"
-                  : "rgba(27,67,50,0.08)",
-              }}>
+          {ranking.map((p, i) => {
+            const prize = prizes[i];
+            const tied = isTied(i);
 
-              <div className="col-span-1 text-xl font-bold">
-                {i < 3 ? MEDAL[i] : (
-                  <span className="text-sm font-bold" style={{ color: "#5a5a5a" }}>{i + 1}º</span>
-                )}
-              </div>
+            return (
+              <Link key={p.id} href={`/palpites/${p.id}`}
+                className="grid grid-cols-12 gap-2 items-center rounded-[16px] border px-5 py-4 transition-all hover:shadow-md hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: i === 0 ? "rgba(201,168,76,0.06)" : "white",
+                  borderColor: i === 0 ? "rgba(201,168,76,0.35)"
+                    : i === 1 ? "rgba(160,160,170,0.25)"
+                    : i === 2 ? "rgba(180,120,60,0.20)"
+                    : "rgba(27,67,50,0.08)",
+                }}>
 
-              <div className="col-span-4 sm:col-span-3">
-                <p className="font-bold text-sm leading-tight" style={{ color: "#1b4332" }}>{p.name}</p>
-                {p.champion && (
-                  <p className="text-xs mt-0.5" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
-                )}
-              </div>
+                <div className="col-span-1 text-xl font-bold">
+                  {i < 3 ? MEDAL[i] : (
+                    <span className="text-sm font-bold" style={{ color: "#5a5a5a" }}>{i + 1}º</span>
+                  )}
+                </div>
 
-              <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
-                {p.groupPts}
-              </div>
-              <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
-                {p.knockoutPts}
-              </div>
-              <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#c9a84c" }}>
-                {p.bonusPts > 0 ? `+${p.bonusPts}` : "—"}
-              </div>
+                <div className="col-span-5 sm:col-span-3">
+                  <p className="font-bold text-sm leading-tight" style={{ color: "#1b4332" }}>{p.name}</p>
+                  {p.champion && (
+                    <p className="text-xs mt-0.5" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
+                  )}
+                </div>
 
-              <div className="col-span-7 sm:col-span-2 text-right">
-                <span className="text-2xl font-black" style={{ color: "#1b4332" }}>{p.total}</span>
-                <span className="text-xs ml-1" style={{ color: "#5a5a5a" }}>pts</span>
-              </div>
-            </Link>
-          ))}
+                <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
+                  {p.groupPts}
+                </div>
+                <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
+                  {p.knockoutPts}
+                </div>
+                <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#c9a84c" }}>
+                  {p.bonusPts > 0 ? `+${p.bonusPts}` : "—"}
+                </div>
+
+                <div className="col-span-6 sm:col-span-3 text-right">
+                  <div>
+                    <span className="text-2xl font-black" style={{ color: "#1b4332" }}>{p.total}</span>
+                    <span className="text-xs ml-1" style={{ color: "#5a5a5a" }}>pts</span>
+                  </div>
+                  {prize !== null && (
+                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                      {tied && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                          style={{ backgroundColor: "rgba(234,179,8,0.15)", color: "#a16207" }}>
+                          dividido
+                        </span>
+                      )}
+                      <span className="text-sm font-bold" style={{ color: "#16a34a" }}>
+                        {formatBRL(prize)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
 
