@@ -80,9 +80,18 @@ export default async function Home() {
   ]);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
 
-  // Top 5 com posição densa e prêmios
-  const podiumCandidates = ranking.filter((_, i) => densePosition(ranking, i) <= 5);
+  // Agrupar top 5 por posição densa
   const prizes = calcPrizes(ranking);
+  type RankEntry = (typeof ranking)[0];
+  const positionGroups: { pos: number; pts: number; prize: number | null; people: RankEntry[] }[] = [];
+  for (const pos of [1, 2, 3, 4, 5]) {
+    const group = ranking.filter((_, i) => densePosition(ranking, i) === pos);
+    if (group.length === 0) break;
+    const rankIdx = ranking.indexOf(group[0]);
+    positionGroups.push({ pos, pts: group[0].total, prize: prizes[rankIdx], people: group });
+  }
+  const top3Groups = positionGroups.filter((g) => g.pos <= 3);
+  const bottom2Groups = positionGroups.filter((g) => g.pos >= 4);
 
   // Participantes em ordem alfabética
   const sortedParticipants = [...participants].sort((a, b) =>
@@ -132,98 +141,102 @@ export default async function Home() {
       </section>
 
       {/* ── PÓDIO ── */}
-      {podiumCandidates.length > 0 && (
+      {positionGroups.length > 0 && (
         <section className="space-y-4">
           <SectionTitle>Pódio Atual</SectionTitle>
 
-          {/* Top 3 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {podiumCandidates.filter((_, i) => {
-              const pos = densePosition(ranking, ranking.indexOf(podiumCandidates[i]));
-              return pos <= 3;
-            }).map((p) => {
-              const rankIdx = ranking.indexOf(p);
-              const pos = densePosition(ranking, rankIdx);
-              const prize = prizes[rankIdx];
-              const tiedCount = ranking.filter((r) => r.total === p.total).length;
-              const style = PODIUM_STYLE[pos] ?? PODIUM_STYLE[5];
-              return (
-                <Link key={p.id} href={`/palpites/${p.id}`}
-                  className="relative group rounded-[20px] p-6 border transition-all hover:shadow-md hover:-translate-y-0.5"
-                  style={{ backgroundColor: style.bg, borderColor: style.border }}>
-                  <span className="text-3xl">{MEDAL[pos]}</span>
-                  <div className="mt-3">
-                    <p className="font-bold text-lg leading-snug" style={{ color: "#1b4332", fontFamily: "var(--font-playfair)" }}>
-                      {p.name}
-                    </p>
-                    <p className="text-3xl font-black mt-1" style={{ color: "#1b4332" }}>{p.total}</p>
-                    <p className="text-xs" style={{ color: "#5a5a5a" }}>pontos</p>
+          {/* Top 3: um bloco por posição */}
+          {top3Groups.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {top3Groups.map(({ pos, pts, prize, people }) => {
+                const style = PODIUM_STYLE[pos];
+                const tied = people.length > 1;
+                return (
+                  <div key={pos} className="rounded-[20px] p-6 border"
+                    style={{ backgroundColor: style.bg, borderColor: style.border }}>
+                    {/* cabeçalho da posição */}
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-3xl">{MEDAL[pos]}</span>
+                      <div className="text-right">
+                        <p className="text-3xl font-black" style={{ color: "#1b4332" }}>{pts}</p>
+                        <p className="text-xs" style={{ color: "#5a5a5a" }}>pontos</p>
+                      </div>
+                    </div>
+                    {/* participantes dessa posição */}
+                    <div className="space-y-2">
+                      {people.map((p) => (
+                        <Link key={p.id} href={`/palpites/${p.id}`}
+                          className="block rounded-[12px] px-3 py-2 transition-all hover:opacity-70"
+                          style={{ backgroundColor: "rgba(255,255,255,0.55)" }}>
+                          <p className="font-bold text-sm leading-snug" style={{ color: "#1b4332", fontFamily: "var(--font-playfair)" }}>
+                            {p.name}
+                          </p>
+                          {p.champion && (
+                            <p className="text-xs mt-0.5" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                    {/* prêmio */}
                     {prize !== null && (
-                      <div className="flex items-center gap-1.5 mt-2">
+                      <div className="flex items-center gap-1.5 mt-4 pt-3" style={{ borderTop: `1px solid ${style.border}` }}>
                         <span className="text-sm font-bold" style={{ color: "#16a34a" }}>{formatBRL(prize)}</span>
-                        {tiedCount > 1 && (
+                        {tied && (
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                             style={{ backgroundColor: "rgba(234,179,8,0.15)", color: "#a16207" }}>
-                            dividido
+                            cada (dividido)
                           </span>
                         )}
                       </div>
                     )}
-                    {p.champion && (
-                      <p className="mt-1.5 text-xs" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
-                    )}
                   </div>
-                </Link>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* 4º e 5º lugar */}
-          {podiumCandidates.some((p) => {
-            const pos = densePosition(ranking, ranking.indexOf(p));
-            return pos >= 4;
-          }) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:max-w-2xl">
-              {podiumCandidates.filter((p) => {
-                const pos = densePosition(ranking, ranking.indexOf(p));
-                return pos >= 4;
-              }).map((p) => {
-                const rankIdx = ranking.indexOf(p);
-                const pos = densePosition(ranking, rankIdx);
-                const prize = prizes[rankIdx];
-                const tiedCount = ranking.filter((r) => r.total === p.total).length;
-                const style = PODIUM_STYLE[pos] ?? PODIUM_STYLE[5];
+          {bottom2Groups.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {bottom2Groups.map(({ pos, pts, prize, people }) => {
+                const style = PODIUM_STYLE[pos];
+                const tied = people.length > 1;
                 return (
-                  <Link key={p.id} href={`/palpites/${p.id}`}
-                    className="relative group rounded-[20px] p-5 border transition-all hover:shadow-md hover:-translate-y-0.5"
+                  <div key={pos} className="rounded-[20px] p-5 border"
                     style={{ backgroundColor: style.bg, borderColor: style.border }}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between mb-3">
                       <span className="text-2xl">{MEDAL[pos]}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold leading-snug truncate" style={{ color: "#1b4332", fontFamily: "var(--font-playfair)" }}>
-                          {p.name}
-                        </p>
-                        {p.champion && (
-                          <p className="text-xs" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-2xl font-black" style={{ color: "#1b4332" }}>{p.total}</p>
-                        <p className="text-xs" style={{ color: "#5a5a5a" }}>pts</p>
-                        {prize !== null && (
-                          <div className="flex items-center justify-end gap-1 mt-0.5">
-                            {tiedCount > 1 && (
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                                style={{ backgroundColor: "rgba(234,179,8,0.15)", color: "#a16207" }}>
-                                dividido
-                              </span>
-                            )}
-                            <span className="text-sm font-bold" style={{ color: "#16a34a" }}>{formatBRL(prize)}</span>
-                          </div>
-                        )}
+                      <div className="text-right">
+                        <p className="text-xl font-black" style={{ color: "#1b4332" }}>{pts}</p>
+                        <p className="text-xs" style={{ color: "#5a5a5a" }}>pontos</p>
                       </div>
                     </div>
-                  </Link>
+                    <div className="space-y-1.5">
+                      {people.map((p) => (
+                        <Link key={p.id} href={`/palpites/${p.id}`}
+                          className="block rounded-[10px] px-3 py-2 transition-all hover:opacity-70"
+                          style={{ backgroundColor: "rgba(255,255,255,0.55)" }}>
+                          <p className="font-semibold text-sm leading-snug" style={{ color: "#1b4332" }}>
+                            {p.name}
+                          </p>
+                          {p.champion && (
+                            <p className="text-xs mt-0.5" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                    {prize !== null && (
+                      <div className="flex items-center gap-1.5 mt-3 pt-2.5" style={{ borderTop: `1px solid ${style.border}` }}>
+                        <span className="text-sm font-bold" style={{ color: "#16a34a" }}>{formatBRL(prize)}</span>
+                        {tied && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                            style={{ backgroundColor: "rgba(234,179,8,0.15)", color: "#a16207" }}>
+                            cada (dividido)
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
