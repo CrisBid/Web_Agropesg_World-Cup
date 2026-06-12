@@ -70,6 +70,7 @@ export const TEAM_MAP: Record<string, string> = {
   "Canada": "Canadá",
   "Bosnia-Herzegovina": "Bósnia e Herzegovina",
   "Bosnia and Herzegovina": "Bósnia e Herzegovina",
+  "Bosnia & Herzegovina": "Bósnia e Herzegovina",
   "United States": "Estados Unidos",
   "USA": "Estados Unidos",
   "Paraguay": "Paraguai",
