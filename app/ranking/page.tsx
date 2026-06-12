@@ -14,21 +14,23 @@ function formatBRL(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Posição densa: empates compartilham a mesma posição e a próxima posição NÃO pula.
+// Ex: 100, 100, 80 → 1º, 1º, 2º
+function densePosition(ranking: { total: number }[], i: number): number {
+  const distinctHigher = new Set(
+    ranking.filter((p) => p.total > ranking[i].total).map((p) => p.total)
+  ).size;
+  return distinctHigher + 1;
+}
+
 // Calcula o prêmio de cada participante considerando empates.
-// Empatados dividem apenas o prêmio da posição que ocupam (não somam as seguintes).
+// Empatados dividem apenas o prêmio da posição que ocupam.
 function calcPrizes(ranking: { total: number }[]): (number | null)[] {
   const prizes: (number | null)[] = new Array(ranking.length).fill(null);
 
-  // Calcular posição real de cada entry (1-indexed, empates repetem o mesmo número)
-  const positions = ranking.map((_, i) =>
-    ranking.filter((p, j) => j < i && p.total > ranking[i].total).length + 1
-  );
-
   for (let i = 0; i < ranking.length; i++) {
-    const pos = positions[i];
+    const pos = densePosition(ranking, i);
     if (pos > PRIZES_CENTS.length) continue;
-
-    // Contar quantos estão empatados nessa posição
     const tiedCount = ranking.filter((p) => p.total === ranking[i].total).length;
     prizes[i] = Math.round(PRIZES_CENTS[pos - 1] / tiedCount);
   }
@@ -68,12 +70,8 @@ export default async function RankingPage() {
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
   const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
-  // Posição real de cada entry (empates compartilham a mesma posição)
-  // Ex: 100, 100, 80 → posições 1, 1, 3
-  const positions = ranking.map((_, i) => {
-    const higher = ranking.filter((p, j) => j < i && p.total > ranking[i].total).length;
-    return higher + 1;
-  });
+  // Posição densa: 100, 100, 80 → 1º, 1º, 2º
+  const positions = ranking.map((_, i) => densePosition(ranking, i));
 
   function isTied(i: number): boolean {
     if (positions[i] > PRIZES_CENTS.length) return false;
