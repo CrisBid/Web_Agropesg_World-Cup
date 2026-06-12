@@ -15,27 +15,24 @@ function formatBRL(cents: number): string {
 }
 
 // Calcula o prêmio de cada participante considerando empates.
-// Participantes empatados dividem a soma dos prêmios das colocações que ocupam.
+// Empatados dividem apenas o prêmio da posição que ocupam (não somam as seguintes).
 function calcPrizes(ranking: { total: number }[]): (number | null)[] {
   const prizes: (number | null)[] = new Array(ranking.length).fill(null);
-  let i = 0;
-  while (i < ranking.length) {
-    // Encontrar fim do grupo de empatados
-    let j = i;
-    while (j < ranking.length && ranking[j].total === ranking[i].total) j++;
 
-    // Somar os prêmios das posições i..j-1
-    let sum = 0;
-    for (let k = i; k < j; k++) {
-      if (k < PRIZES_CENTS.length) sum += PRIZES_CENTS[k];
-    }
+  // Calcular posição real de cada entry (1-indexed, empates repetem o mesmo número)
+  const positions = ranking.map((_, i) =>
+    ranking.filter((p, j) => j < i && p.total > ranking[i].total).length + 1
+  );
 
-    if (sum > 0) {
-      const share = Math.round(sum / (j - i));
-      for (let k = i; k < j; k++) prizes[k] = share;
-    }
-    i = j;
+  for (let i = 0; i < ranking.length; i++) {
+    const pos = positions[i];
+    if (pos > PRIZES_CENTS.length) continue;
+
+    // Contar quantos estão empatados nessa posição
+    const tiedCount = ranking.filter((p) => p.total === ranking[i].total).length;
+    prizes[i] = Math.round(PRIZES_CENTS[pos - 1] / tiedCount);
   }
+
   return prizes;
 }
 
@@ -69,13 +66,18 @@ export default async function RankingPage() {
 
   const prizes = calcPrizes(ranking);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
-  const MEDAL = ["🥇", "🥈", "🥉"];
+  const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
-  // Detectar empates na zona de prêmios
+  // Posição real de cada entry (empates compartilham a mesma posição)
+  // Ex: 100, 100, 80 → posições 1, 1, 3
+  const positions = ranking.map((_, i) => {
+    const higher = ranking.filter((p, j) => j < i && p.total > ranking[i].total).length;
+    return higher + 1;
+  });
+
   function isTied(i: number): boolean {
-    if (i >= PRIZES_CENTS.length) return false;
-    const total = ranking[i].total;
-    return ranking.filter((p) => p.total === total).length > 1;
+    if (positions[i] > PRIZES_CENTS.length) return false;
+    return ranking.filter((p) => p.total === ranking[i].total).length > 1;
   }
 
   return (
@@ -166,21 +168,22 @@ export default async function RankingPage() {
           {ranking.map((p, i) => {
             const prize = prizes[i];
             const tied = isTied(i);
+            const pos = positions[i];
 
             return (
               <Link key={p.id} href={`/palpites/${p.id}`}
                 className="grid grid-cols-12 gap-2 items-center rounded-[16px] border px-5 py-4 transition-all hover:shadow-md hover:-translate-y-0.5"
                 style={{
-                  backgroundColor: i === 0 ? "rgba(201,168,76,0.06)" : "white",
-                  borderColor: i === 0 ? "rgba(201,168,76,0.35)"
-                    : i === 1 ? "rgba(160,160,170,0.25)"
-                    : i === 2 ? "rgba(180,120,60,0.20)"
+                  backgroundColor: pos === 1 ? "rgba(201,168,76,0.06)" : "white",
+                  borderColor: pos === 1 ? "rgba(201,168,76,0.35)"
+                    : pos === 2 ? "rgba(160,160,170,0.25)"
+                    : pos === 3 ? "rgba(180,120,60,0.20)"
                     : "rgba(27,67,50,0.08)",
                 }}>
 
                 <div className="col-span-1 text-xl font-bold">
-                  {i < 3 ? MEDAL[i] : (
-                    <span className="text-sm font-bold" style={{ color: "#5a5a5a" }}>{i + 1}º</span>
+                  {MEDAL[pos] ?? (
+                    <span className="text-sm font-bold" style={{ color: "#5a5a5a" }}>{pos}º</span>
                   )}
                 </div>
 
