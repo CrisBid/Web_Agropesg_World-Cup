@@ -4,6 +4,30 @@ import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
 
+const PRIZES_CENTS = [220000, 80000, 50000, 20000, 10000];
+
+function densePosition(ranking: { total: number }[], i: number): number {
+  const distinctHigher = new Set(
+    ranking.filter((p) => p.total > ranking[i].total).map((p) => p.total)
+  ).size;
+  return distinctHigher + 1;
+}
+
+function calcPrizes(ranking: { total: number }[]): (number | null)[] {
+  const prizes: (number | null)[] = new Array(ranking.length).fill(null);
+  for (let i = 0; i < ranking.length; i++) {
+    const pos = densePosition(ranking, i);
+    if (pos > PRIZES_CENTS.length) continue;
+    const tiedCount = ranking.filter((p) => p.total === ranking[i].total).length;
+    prizes[i] = Math.round(PRIZES_CENTS[pos - 1] / tiedCount);
+  }
+  return prizes;
+}
+
+function formatBRL(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 async function getRanking() {
   const [participants, results] = await Promise.all([getParticipants(), getResults()]);
   const gamesPhaseMap: Record<number, Phase> = {};
@@ -19,12 +43,15 @@ async function getRanking() {
   return entries.sort((a, b) => b.total - a.total);
 }
 
-const MEDAL = ["🥇", "🥈", "🥉"];
-const MEDAL_BG = [
-  { bg: "rgba(201,168,76,0.10)", border: "rgba(201,168,76,0.30)", text: "#8b7028" },
-  { bg: "rgba(160,160,170,0.10)", border: "rgba(160,160,170,0.30)", text: "#5a5a70" },
-  { bg: "rgba(180,120,60,0.10)", border: "rgba(180,120,60,0.30)", text: "#7a4a20" },
-];
+const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉", 4: "4️⃣", 5: "5️⃣" };
+
+const PODIUM_STYLE: Record<number, { bg: string; border: string }> = {
+  1: { bg: "rgba(201,168,76,0.10)", border: "rgba(201,168,76,0.30)" },
+  2: { bg: "rgba(160,160,170,0.10)", border: "rgba(160,160,170,0.30)" },
+  3: { bg: "rgba(180,120,60,0.10)", border: "rgba(180,120,60,0.30)" },
+  4: { bg: "rgba(27,67,50,0.04)", border: "rgba(27,67,50,0.12)" },
+  5: { bg: "rgba(27,67,50,0.04)", border: "rgba(27,67,50,0.12)" },
+};
 
 const SCORING_GROUPS = [
   { label: "Resultado correto (V/E/D)", pts: 3 },
@@ -53,13 +80,21 @@ export default async function Home() {
   ]);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
 
+  // Top 5 com posição densa e prêmios
+  const podiumCandidates = ranking.filter((_, i) => densePosition(ranking, i) <= 5);
+  const prizes = calcPrizes(ranking);
+
+  // Participantes em ordem alfabética
+  const sortedParticipants = [...participants].sort((a, b) =>
+    a.name.localeCompare(b.name, "pt-BR")
+  );
+
   return (
     <div className="space-y-12">
 
       {/* ── HERO ── */}
       <section className="relative overflow-hidden rounded-[28px] px-8 py-14 text-center"
         style={{ backgroundColor: "#1b4332" }}>
-        {/* decorative blobs */}
         <div className="blob w-64 h-64 -top-16 -left-16" style={{ backgroundColor: "rgba(82,183,136,0.25)" }} />
         <div className="blob w-48 h-48 -bottom-12 -right-12" style={{ backgroundColor: "rgba(201,168,76,0.20)" }} />
 
@@ -97,28 +132,103 @@ export default async function Home() {
       </section>
 
       {/* ── PÓDIO ── */}
-      {ranking.length > 0 && (
+      {podiumCandidates.length > 0 && (
         <section className="space-y-4">
           <SectionTitle>Pódio Atual</SectionTitle>
+
+          {/* Top 3 */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {ranking.slice(0, 3).map((p, i) => (
-              <Link key={p.id} href={`/palpites/${p.id}`}
-                className="relative group rounded-[20px] p-6 border transition-all hover:shadow-md hover:-translate-y-0.5"
-                style={{ backgroundColor: "white", borderColor: MEDAL_BG[i]?.border ?? "rgba(27,67,50,0.08)" }}>
-                <span className="text-3xl">{MEDAL[i]}</span>
-                <div className="mt-3">
-                  <p className="font-bold text-lg leading-snug" style={{ color: "#1b4332", fontFamily: "var(--font-playfair)" }}>
-                    {p.name}
-                  </p>
-                  <p className="text-3xl font-black mt-1" style={{ color: "#1b4332" }}>{p.total}</p>
-                  <p className="text-xs" style={{ color: "#5a5a5a" }}>pontos</p>
-                  {p.champion && (
-                    <p className="mt-2 text-xs" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
-                  )}
-                </div>
-              </Link>
-            ))}
+            {podiumCandidates.filter((_, i) => {
+              const pos = densePosition(ranking, ranking.indexOf(podiumCandidates[i]));
+              return pos <= 3;
+            }).map((p) => {
+              const rankIdx = ranking.indexOf(p);
+              const pos = densePosition(ranking, rankIdx);
+              const prize = prizes[rankIdx];
+              const tiedCount = ranking.filter((r) => r.total === p.total).length;
+              const style = PODIUM_STYLE[pos] ?? PODIUM_STYLE[5];
+              return (
+                <Link key={p.id} href={`/palpites/${p.id}`}
+                  className="relative group rounded-[20px] p-6 border transition-all hover:shadow-md hover:-translate-y-0.5"
+                  style={{ backgroundColor: style.bg, borderColor: style.border }}>
+                  <span className="text-3xl">{MEDAL[pos]}</span>
+                  <div className="mt-3">
+                    <p className="font-bold text-lg leading-snug" style={{ color: "#1b4332", fontFamily: "var(--font-playfair)" }}>
+                      {p.name}
+                    </p>
+                    <p className="text-3xl font-black mt-1" style={{ color: "#1b4332" }}>{p.total}</p>
+                    <p className="text-xs" style={{ color: "#5a5a5a" }}>pontos</p>
+                    {prize !== null && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className="text-sm font-bold" style={{ color: "#16a34a" }}>{formatBRL(prize)}</span>
+                        {tiedCount > 1 && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                            style={{ backgroundColor: "rgba(234,179,8,0.15)", color: "#a16207" }}>
+                            dividido
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {p.champion && (
+                      <p className="mt-1.5 text-xs" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
+
+          {/* 4º e 5º lugar */}
+          {podiumCandidates.some((p) => {
+            const pos = densePosition(ranking, ranking.indexOf(p));
+            return pos >= 4;
+          }) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:max-w-2xl">
+              {podiumCandidates.filter((p) => {
+                const pos = densePosition(ranking, ranking.indexOf(p));
+                return pos >= 4;
+              }).map((p) => {
+                const rankIdx = ranking.indexOf(p);
+                const pos = densePosition(ranking, rankIdx);
+                const prize = prizes[rankIdx];
+                const tiedCount = ranking.filter((r) => r.total === p.total).length;
+                const style = PODIUM_STYLE[pos] ?? PODIUM_STYLE[5];
+                return (
+                  <Link key={p.id} href={`/palpites/${p.id}`}
+                    className="relative group rounded-[20px] p-5 border transition-all hover:shadow-md hover:-translate-y-0.5"
+                    style={{ backgroundColor: style.bg, borderColor: style.border }}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{MEDAL[pos]}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold leading-snug truncate" style={{ color: "#1b4332", fontFamily: "var(--font-playfair)" }}>
+                          {p.name}
+                        </p>
+                        {p.champion && (
+                          <p className="text-xs" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-2xl font-black" style={{ color: "#1b4332" }}>{p.total}</p>
+                        <p className="text-xs" style={{ color: "#5a5a5a" }}>pts</p>
+                        {prize !== null && (
+                          <div className="flex items-center justify-end gap-1 mt-0.5">
+                            {tiedCount > 1 && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                                style={{ backgroundColor: "rgba(234,179,8,0.15)", color: "#a16207" }}>
+                                dividido
+                              </span>
+                            )}
+                            <span className="text-sm font-bold" style={{ color: "#16a34a" }}>{formatBRL(prize)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           <div className="text-right">
             <Link href="/ranking" className="text-sm font-semibold transition-colors hover:opacity-70"
               style={{ color: "#2d6a4f" }}>
@@ -132,14 +242,9 @@ export default async function Home() {
       <section className="space-y-4">
         <div className="flex items-end justify-between">
           <SectionTitle>Participantes</SectionTitle>
-          {/*<Link href="/admin/participantes" className="text-sm transition-colors hover:opacity-70"
-            style={{ color: "#52b788" }}>
-            Gerenciar →
-          </Link>
-          */}
         </div>
 
-        {participants.length === 0 ? (
+        {sortedParticipants.length === 0 ? (
           <div className="rounded-[20px] border border-dashed p-12 text-center"
             style={{ borderColor: "rgba(27,67,50,0.2)" }}>
             <div className="text-5xl mb-3">👥</div>
@@ -152,18 +257,20 @@ export default async function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {participants.map((p) => {
-              const rank = ranking.findIndex((r) => r.id === p.id);
-              const pts = ranking[rank]?.total ?? 0;
-              const champion = ranking[rank]?.champion;
+            {sortedParticipants.map((p) => {
+              const rankIdx = ranking.findIndex((r) => r.id === p.id);
+              const pts = ranking[rankIdx]?.total ?? 0;
+              const champion = ranking[rankIdx]?.champion;
+              const pos = rankIdx >= 0 ? densePosition(ranking, rankIdx) : null;
+              const isTop = pos !== null && pos <= 3;
               return (
                 <Link key={p.id} href={`/palpites/${p.id}`}
                   className="group flex items-center justify-between rounded-[16px] border p-4 transition-all hover:shadow-md hover:-translate-y-0.5"
                   style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-                      style={{ backgroundColor: rank < 3 ? "#1b4332" : "#52b788" }}>
-                      {rank + 1}
+                      style={{ backgroundColor: isTop ? "#1b4332" : "#52b788" }}>
+                      {pos ?? "—"}
                     </div>
                     <div>
                       <p className="font-semibold leading-tight" style={{ color: "#1b4332" }}>{p.name}</p>
