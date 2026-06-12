@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Participant {
+  id                  String   @id
+  name                String
+  phone               String   @unique
+  createdAt           DateTime @default(now())
+  lockedAt            DateTime?
+  isAdmin             Boolean  @default(false)
+  predictedChampion   String?
+  predictedThirdPlace String?
+
+  groupPredictions    GroupPrediction[]
+  knockoutPredictions KnockoutPrediction[]
+
+  @@map("participants")
+}
+
+model GroupPrediction {
+  participantId String
+  gameId        Int
+  scoreA        Int?
+  scoreB        Int?
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([participantId, gameId])
+  @@map("group_predictions")
+}
+
+model KnockoutPrediction {
+  participantId String
+  gameId        Int
+  winner        String?
+  scoreA        Int?
+  scoreB        Int?
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([participantId, gameId])
+  @@map("knockout_predictions")
+}
+
+model GroupResult {
+  gameId Int @id
+  scoreA Int
+  scoreB Int
+
+  @@map("group_results")
+}
+
+model KnockoutResult {
+  gameId Int     @id
+  scoreA Int?
+  scoreB Int?
+  winner String
+
+  @@map("knockout_results")
+}
+
+model KnockoutTeam {
+  gameId Int    @id
+  teamA  String
+  teamB  String
+
+  @@map("knockout_teams")
+}
+
+model TournamentSettings {
+  id         Int     @id @default(1)
+  champion   String?
+  thirdPlace String?
+
+  @@map("tournament_settings")
+}

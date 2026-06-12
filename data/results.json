@@ -1,0 +1,16 @@
+{
+  "groups": {
+    "1": {
+      "scoreA": 2,
+      "scoreB": 0
+    },
+    "2": {
+      "scoreA": 2,
+      "scoreB": 1
+    }
+  },
+  "knockout": {},
+  "knockoutTeams": {},
+  "champion": null,
+  "thirdPlace": null
+}

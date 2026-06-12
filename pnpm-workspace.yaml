@@ -1,3 +1,4 @@
 ignoredBuiltDependencies:
+  - prisma
   - sharp
   - unrs-resolver

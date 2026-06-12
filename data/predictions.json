@@ -1,0 +1,458 @@
+{
+  "1780936825059": {
+    "groups": {
+      "1": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "2": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "3": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "4": {
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "5": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "6": {
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "7": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "8": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "9": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "10": {
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "11": {
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "12": {
+        "scoreA": 1,
+        "scoreB": 1
+      },
+      "13": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "14": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "15": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "16": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "17": {
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "18": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "19": {
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "20": {
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "21": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "22": {
+        "scoreA": 1,
+        "scoreB": 1
+      },
+      "23": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "24": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "25": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "26": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "27": {
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "28": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "29": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "30": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "31": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "32": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "33": {
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "34": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "35": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "36": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "37": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "38": {
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "39": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "40": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "41": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "42": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "43": {
+        "scoreA": 0,
+        "scoreB": 2
+      },
+      "44": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "45": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "46": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "47": {
+        "scoreA": 0,
+        "scoreB": 2
+      },
+      "48": {
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "49": {
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "50": {
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "51": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "52": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "53": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "54": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "55": {
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "56": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "57": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "58": {
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "59": {
+        "scoreA": 0,
+        "scoreB": 1
+      },
+      "60": {
+        "scoreA": 1,
+        "scoreB": 1
+      },
+      "61": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "62": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "63": {
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "64": {
+        "scoreA": 0,
+        "scoreB": 1
+      },
+      "65": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "66": {
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "67": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "68": {
+        "scoreA": 3,
+        "scoreB": 0
+      },
+      "69": {
+        "scoreA": 0,
+        "scoreB": 1
+      },
+      "70": {
+        "scoreA": 1,
+        "scoreB": 1
+      },
+      "71": {
+        "scoreA": 0,
+        "scoreB": 3
+      },
+      "72": {
+        "scoreA": 0,
+        "scoreB": 1
+      }
+    },
+    "knockout": {
+      "73": {
+        "winner": "Coreia do Sul",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "74": {
+        "winner": "Alemanha",
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "75": {
+        "winner": "Marrocos",
+        "scoreA": 0,
+        "scoreB": 1
+      },
+      "76": {
+        "winner": "Brasil",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "77": {
+        "winner": "França",
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "78": {
+        "winner": "Senegal",
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "79": {
+        "winner": "México",
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "80": {
+        "winner": "Inglaterra",
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "81": {
+        "winner": "Estados Unidos",
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "82": {
+        "winner": "Bélgica",
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "83": {
+        "winner": "Colômbia",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "84": {
+        "winner": "Espanha",
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "85": {
+        "winner": "Suíça",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "86": {
+        "winner": "Argentina",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "87": {
+        "winner": "Portugal",
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "88": {
+        "winner": "Egito",
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "89": {
+        "winner": "França",
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "90": {
+        "winner": "Marrocos",
+        "scoreA": 0,
+        "scoreB": 2
+      },
+      "91": {
+        "winner": "Brasil",
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "92": {
+        "winner": "Inglaterra",
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "93": {
+        "winner": "Espanha",
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "94": {
+        "winner": "Bélgica",
+        "scoreA": 0,
+        "scoreB": 1
+      },
+      "95": {
+        "winner": "Argentina",
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "96": {
+        "winner": "Portugal",
+        "scoreA": 1,
+        "scoreB": 2
+      },
+      "97": {
+        "winner": "França",
+        "scoreA": 2,
+        "scoreB": 0
+      },
+      "98": {
+        "winner": "Espanha",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "99": {
+        "winner": "Brasil",
+        "scoreA": 2,
+        "scoreB": 1
+      },
+      "100": {
+        "winner": "Argentina",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "101": {
+        "winner": "França",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "102": {
+        "winner": "Argentina",
+        "scoreA": 0,
+        "scoreB": 1
+      },
+      "103": {
+        "winner": "Espanha",
+        "scoreA": 1,
+        "scoreB": 0
+      },
+      "104": {
+        "winner": "França",
+        "scoreA": 2,
+        "scoreB": 1
+      }
+    },
+    "champion": "França",
+    "thirdPlace": "Brasil"
+  }
+}
