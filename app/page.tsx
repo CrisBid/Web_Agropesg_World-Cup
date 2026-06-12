@@ -132,10 +132,11 @@ export default async function Home() {
       <section className="space-y-4">
         <div className="flex items-end justify-between">
           <SectionTitle>Participantes</SectionTitle>
-          <Link href="/admin/participantes" className="text-sm transition-colors hover:opacity-70"
+          {/*<Link href="/admin/participantes" className="text-sm transition-colors hover:opacity-70"
             style={{ color: "#52b788" }}>
             Gerenciar →
           </Link>
+          */}
         </div>
 
         {participants.length === 0 ? (
