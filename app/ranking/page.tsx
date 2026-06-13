@@ -3,9 +3,9 @@ import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
 import Link from "next/link";
-import RankingSection, { type RankingEntry } from "./RankingSection";
-import TodayGames from "./TodayGames";
+import type { RankingEntry } from "./RankingSection";
 import type { TodayGameItem } from "./TodayGames";
+import RankingPageClient from "./RankingPageClient";
 
 function todayBRT(): string {
   const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -15,10 +15,6 @@ function todayBRT(): string {
 export const dynamic = "force-dynamic";
 
 const PRIZES_CENTS = [220000, 80000, 50000, 20000, 10000];
-
-function formatBRL(cents: number): string {
-  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 
 function densePosition(ranking: { total: number }[], i: number): number {
   return new Set(ranking.filter((p) => p.total > ranking[i].total).map((p) => p.total)).size + 1;
@@ -85,53 +81,8 @@ export default async function RankingPage() {
         </Link>
       </div>
 
-      {/* Jogos do dia */}
-      <TodayGames items={todayItems} />
-
-      {/* Tabela de prêmios */}
-      <div className="rounded-[20px] border p-5" style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-4" style={{ color: "#5a5a5a" }}>
-          Premiação
-        </p>
-        <div className="flex flex-wrap gap-3">
-          {PRIZES_CENTS.map((v, i) => (
-            <div key={i}
-              className="flex items-center gap-2.5 rounded-[12px] px-4 py-2.5 border"
-              style={{
-                backgroundColor: i === 0 ? "rgba(201,168,76,0.08)" : "rgba(27,67,50,0.03)",
-                borderColor: i === 0 ? "rgba(201,168,76,0.30)" : "rgba(27,67,50,0.08)",
-              }}>
-              <span className="text-lg">{["🥇","🥈","🥉","4️⃣","5️⃣"][i]}</span>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#5a5a5a" }}>
-                  {i + 1}º lugar
-                </p>
-                <p className="text-sm font-black" style={{ color: i === 0 ? "#8b7028" : "#1b4332" }}>
-                  {formatBRL(v)}
-                </p>
-              </div>
-            </div>
-          ))}
-          <div className="flex items-center gap-2.5 rounded-[12px] px-4 py-2.5 border"
-            style={{ backgroundColor: "rgba(82,183,136,0.06)", borderColor: "rgba(82,183,136,0.20)" }}>
-            <span className="text-lg">💰</span>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#5a5a5a" }}>
-                Total
-              </p>
-              <p className="text-sm font-black" style={{ color: "#1b4332" }}>
-                {formatBRL(PRIZES_CENTS.reduce((s, v) => s + v, 0))}
-              </p>
-            </div>
-          </div>
-        </div>
-        <p className="text-xs mt-3" style={{ color: "#9a9a9a" }}>
-          Em caso de empate, o prêmio das colocações é dividido igualmente entre os empatados.
-        </p>
-      </div>
-
-      {/* Ranking com live + acordeão */}
-      <RankingSection entries={entries} />
+      {/* Jogos de Hoje + Premiação + Ranking (client — collapses Jogos/Premiação when live) */}
+      <RankingPageClient todayItems={todayItems} entries={entries} />
     </div>
   );
 }

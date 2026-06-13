@@ -26,9 +26,10 @@ export interface RankingEntry {
 
 interface Props {
   entries: RankingEntry[];
+  onLiveChange?: (isLive: boolean) => void;
 }
 
-export default function RankingSection({ entries }: Props) {
+export default function RankingSection({ entries, onLiveChange }: Props) {
   const [accordionOpen, setAccordionOpen] = useState(true);
   const [liveActivated, setLiveActivated] = useState(false);
 
@@ -37,7 +38,8 @@ export default function RankingSection({ entries }: Props) {
       setLiveActivated(true);
       setAccordionOpen(false);
     }
-  }, [liveActivated]);
+    onLiveChange?.(isLive);
+  }, [liveActivated, onLiveChange]);
 
   const baseRanking = entries.map((e) => ({ id: e.id, name: e.name, total: e.total }));
 

@@ -1,10 +1,11 @@
 import { getLiveMatchesWithStats, isAnyGameExpectedLive, computeBudget } from "@/lib/api-football";
-import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides } from "@/lib/data";
+import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getGroupGameStats } from "@/lib/data";
 import { GAMES } from "@/lib/games-data";
+import type { GamePredictionStats } from "@/lib/data";
 
-const PRE_WINDOW_MS = 30 * 60_000; // show banner 30 min before kickoff
+const PRE_WINDOW_MS = 30 * 60_000;
 
-// ─── Upcoming games (next 30 min) ─────────────────────────────────────────
+// ─── Upcoming games ────────────────────────────────────────────────────────
 
 function getUpcomingGames() {
   const now = Date.now();
@@ -25,7 +26,7 @@ function getUpcomingGames() {
 
 // ─── Fake data for test modes ──────────────────────────────────────────────
 
-const FAKE_KICKOFF_OFFSET = 20 * 60_000; // 20 min from now for pre-game test
+const FAKE_KICKOFF_OFFSET = 20 * 60_000;
 
 function fakePreData() {
   return {
@@ -37,6 +38,15 @@ function fakePreData() {
     kickoffMs: Date.now() + FAKE_KICKOFF_OFFSET,
   };
 }
+
+const FAKE_PRED_STATS: GamePredictionStats = {
+  total: 17,
+  homeWins: 9,
+  draws: 4,
+  awayWins: 4,
+  topScores: [],
+  othersCount: 0,
+};
 
 function fakeLiveMatch(status: "2H" | "FT") {
   return {
@@ -84,6 +94,7 @@ export async function GET() {
     return Response.json({
       matches: [],
       upcoming: [fakePreData()],
+      predStats: {},
       expected: false,
       budget,
       testMode: "pre",
@@ -93,6 +104,7 @@ export async function GET() {
     return Response.json({
       matches: [fakeLiveMatch("2H")],
       upcoming: [],
+      predStats: { 99999: FAKE_PRED_STATS },
       expected: true,
       fetchedAt: new Date().toISOString(),
       budget,
@@ -103,6 +115,7 @@ export async function GET() {
     return Response.json({
       matches: [fakeLiveMatch("FT")],
       upcoming: [],
+      predStats: { 99999: FAKE_PRED_STATS },
       expected: false,
       fetchedAt: new Date().toISOString(),
       budget,
@@ -115,14 +128,14 @@ export async function GET() {
 
   if (!enabled) {
     return Response.json(
-      { matches: [], upcoming: [], expected: false, disabled: true, budget },
+      { matches: [], upcoming: [], predStats: {}, expected: false, disabled: true, budget },
       { headers: { "Cache-Control": "public, max-age=30" } }
     );
   }
 
   if (!isAnyGameExpectedLive() && upcoming.length === 0) {
     return Response.json(
-      { matches: [], upcoming, expected: false, budget },
+      { matches: [], upcoming, predStats: {}, expected: false, budget },
       { headers: { "Cache-Control": "public, max-age=60" } }
     );
   }
@@ -145,10 +158,26 @@ export async function GET() {
     perGameReqOverrides,
   });
 
+  // Fetch prediction stats for live group games
+  const predStats: Record<number, GamePredictionStats> = {};
+  await Promise.all(
+    matches
+      .filter((m) => m.gameId !== null)
+      .map(async (m) => {
+        const game = GAMES.find((g) => g.id === m.gameId);
+        if (!game) return;
+        const s = game.phase === "grupos"
+          ? await getGroupGameStats(m.gameId!)
+          : { total: 0, homeWins: 0, draws: 0, awayWins: 0, topScores: [], othersCount: 0 };
+        predStats[m.fixtureId] = s;
+      })
+  );
+
   return Response.json(
     {
       matches,
       upcoming: upcoming.filter((u) => !disabledGameIds.has(u.gameId)),
+      predStats,
       expected: true,
       fetchedAt: new Date().toISOString(),
       budget,

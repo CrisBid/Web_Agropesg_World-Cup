@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import type { LiveMatch, LiveStats } from "@/lib/api-football";
+import type { GamePredictionStats } from "@/lib/data";
 import { GAMES, PHASE_LABELS } from "@/lib/games-data";
 
 const POST_GAME_FREEZE_MS = 30 * 60_000; // show frozen result for 30 min
@@ -22,6 +23,7 @@ interface BudgetInfo {
 interface LiveResponse {
   matches: LiveMatch[];
   upcoming: UpcomingGame[];
+  predStats: Record<number, GamePredictionStats>;
   expected: boolean;
   fetchedAt?: string;
   budget: BudgetInfo;
@@ -56,8 +58,50 @@ function StatBar({ label, home, away, unit = "" }: { label: string; home: number
   );
 }
 
-function MatchCard({ match, expanded, onToggle, frozen }: {
+function PredictionBar({ homeTeam, awayTeam, stats }: {
+  homeTeam: string; awayTeam: string; stats: GamePredictionStats;
+}) {
+  if (stats.total === 0) return null;
+  const homePct  = Math.round((stats.homeWins / stats.total) * 100);
+  const drawPct  = Math.round((stats.draws    / stats.total) * 100);
+  const awayPct  = 100 - homePct - drawPct;
+
+  return (
+    <div className="px-4 pb-3 pt-2 space-y-1.5 border-t" style={{ borderColor: "rgba(27,67,50,0.06)" }}>
+      <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#9a9a9a" }}>
+        <span>Apostas · {stats.total} participante{stats.total !== 1 ? "s" : ""}</span>
+      </div>
+      {/* Segmented bar */}
+      <div className="flex h-2 rounded-full overflow-hidden gap-px">
+        {homePct > 0 && (
+          <div className="h-full transition-all duration-700" style={{ width: `${homePct}%`, backgroundColor: "#1b4332" }} />
+        )}
+        {drawPct > 0 && (
+          <div className="h-full transition-all duration-700" style={{ width: `${drawPct}%`, backgroundColor: "#c9a84c" }} />
+        )}
+        {awayPct > 0 && (
+          <div className="h-full transition-all duration-700" style={{ width: `${awayPct}%`, backgroundColor: "#52b788" }} />
+        )}
+      </div>
+      {/* Labels */}
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="font-semibold truncate max-w-[35%]" style={{ color: "#1b4332" }}>
+          {homeTeam} <span className="font-black">{homePct}%</span>
+        </span>
+        <span className="font-semibold shrink-0" style={{ color: "#a16207" }}>
+          Empate <span className="font-black">{drawPct}%</span>
+        </span>
+        <span className="font-semibold truncate max-w-[35%] text-right" style={{ color: "#2d6a4f" }}>
+          {awayTeam} <span className="font-black">{awayPct}%</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function MatchCard({ match, expanded, onToggle, frozen, predStats }: {
   match: LiveMatch; expanded: boolean; onToggle: () => void; frozen?: boolean;
+  predStats?: GamePredictionStats;
 }) {
   const isHt   = match.status === "HT";
   const isFt   = match.status === "FT";
@@ -131,6 +175,15 @@ function MatchCard({ match, expanded, onToggle, frozen }: {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Prediction bar */}
+      {predStats && predStats.total > 0 && (
+        <PredictionBar
+          homeTeam={match.homeTeam}
+          awayTeam={match.awayTeam}
+          stats={predStats}
+        />
       )}
 
       {/* Stats panel */}
@@ -209,6 +262,7 @@ function UpcomingCard({ game }: { game: UpcomingGame }) {
 export default function LiveScoreBanner() {
   const [data, setData] = useState<LiveResponse | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [frozenPredStats, setFrozenPredStats] = useState<Record<number, GamePredictionStats>>({});
 
   // Post-game freeze state
   const [frozenMatches, setFrozenMatches] = useState<LiveMatch[]>([]);
@@ -231,8 +285,9 @@ export default function LiveScoreBanner() {
           // Track live → ended transition (for real games and test "post" mode)
           if (json.matches.length > 0 && !isTestPost) {
             hadLiveRef.current = true;
-            setFrozenMatches(json.matches); // keep updating frozen snapshot while live
-            setGameEndedAt(null); // still live — reset end time
+            setFrozenMatches(json.matches);
+            if (json.predStats) setFrozenPredStats(json.predStats);
+            setGameEndedAt(null);
           } else if (hadLiveRef.current && json.matches.length === 0 && !isTestPost) {
             // Game just ended: start freeze
             setGameEndedAt((prev) => prev ?? Date.now());
@@ -241,6 +296,7 @@ export default function LiveScoreBanner() {
           // For test "post" mode: always freeze the fake match
           if (isTestPost && json.matches.length > 0) {
             setFrozenMatches(json.matches);
+            if (json.predStats) setFrozenPredStats(json.predStats);
             setGameEndedAt((prev) => prev ?? Date.now());
             hadLiveRef.current = true;
           }
@@ -331,15 +387,21 @@ export default function LiveScoreBanner() {
         {/* Match cards (live or frozen post-game) */}
         {(isLive || isPostGame) && displayMatches.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {displayMatches.map((m) => (
-              <MatchCard
-                key={m.fixtureId}
-                match={m}
-                frozen={isPostGame}
-                expanded={expandedId === m.fixtureId}
-                onToggle={() => setExpandedId(expandedId === m.fixtureId ? null : m.fixtureId)}
-              />
-            ))}
+            {displayMatches.map((m) => {
+              const ps = isLive
+                ? (data?.predStats ?? {})[m.fixtureId]
+                : frozenPredStats[m.fixtureId];
+              return (
+                <MatchCard
+                  key={m.fixtureId}
+                  match={m}
+                  frozen={isPostGame}
+                  predStats={ps}
+                  expanded={expandedId === m.fixtureId}
+                  onToggle={() => setExpandedId(expandedId === m.fixtureId ? null : m.fixtureId)}
+                />
+              );
+            })}
           </div>
         )}
 
