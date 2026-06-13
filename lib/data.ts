@@ -273,3 +273,50 @@ export async function setLiveScoreEnabled(enabled: boolean): Promise<void> {
     create: { id: 1, liveScoreEnabled: enabled },
   });
 }
+
+// ─── Live Admin Settings ──────────────────────────────────────────────────────
+
+export interface LiveAdminSettings {
+  liveStatsEnabled: boolean;
+  liveMaxReqPerGame: number | null;
+}
+
+export async function getLiveAdminSettings(): Promise<LiveAdminSettings> {
+  const s = await prisma.tournamentSettings.findUnique({ where: { id: 1 } });
+  return {
+    liveStatsEnabled: s?.liveStatsEnabled ?? true,
+    liveMaxReqPerGame: s?.liveMaxReqPerGame ?? null,
+  };
+}
+
+export async function setLiveAdminSettings(settings: LiveAdminSettings): Promise<void> {
+  await prisma.tournamentSettings.upsert({
+    where: { id: 1 },
+    update: {
+      liveStatsEnabled: settings.liveStatsEnabled,
+      liveMaxReqPerGame: settings.liveMaxReqPerGame,
+    },
+    create: {
+      id: 1,
+      liveStatsEnabled: settings.liveStatsEnabled,
+      liveMaxReqPerGame: settings.liveMaxReqPerGame,
+    },
+  });
+}
+
+// ─── Per-game live overrides ──────────────────────────────────────────────────
+
+export async function getLiveGameOverrides(): Promise<Record<number, boolean>> {
+  const rows = await prisma.liveGameOverride.findMany();
+  const result: Record<number, boolean> = {};
+  for (const r of rows) result[r.gameId] = r.liveEnabled;
+  return result;
+}
+
+export async function setLiveGameOverride(gameId: number, enabled: boolean): Promise<void> {
+  await prisma.liveGameOverride.upsert({
+    where: { gameId },
+    update: { liveEnabled: enabled },
+    create: { gameId, liveEnabled: enabled },
+  });
+}

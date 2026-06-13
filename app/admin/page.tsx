@@ -1,15 +1,38 @@
 import Link from "next/link";
-import { getParticipants, getResults, getLiveScoreEnabled } from "@/lib/data";
+import { getParticipants, getResults, getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides } from "@/lib/data";
+import { GAMES } from "@/lib/games-data";
+import { computeBudget } from "@/lib/api-football";
 import SyncButton from "./SyncButton";
 import LiveToggle from "./LiveToggle";
+import LiveAdminControls from "./LiveAdminControls";
+
+function todayBRT(): string {
+  const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  return brt.toISOString().slice(0, 10);
+}
 
 export default async function AdminPage() {
-  const [participants, results, liveEnabled] = await Promise.all([
+  const [participants, results, liveEnabled, adminSettings, gameOverrides] = await Promise.all([
     getParticipants(),
     getResults(),
     getLiveScoreEnabled(),
+    getLiveAdminSettings(),
+    getLiveGameOverrides(),
   ]);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
+
+  const today = todayBRT();
+  const todayGames = GAMES
+    .filter((g) => g.date.slice(0, 10) === today)
+    .map((g) => ({
+      id: g.id,
+      teamA: g.teamA,
+      teamB: g.teamB,
+      time: g.date.slice(11, 16),
+      liveEnabled: gameOverrides[g.id] ?? true,
+    }));
+
+  const budget = computeBudget(adminSettings.liveMaxReqPerGame);
 
   const cards = [
     {
@@ -66,8 +89,16 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      {/* Live score toggle */}
+      {/* Live score global toggle */}
       <LiveToggle initialEnabled={liveEnabled} />
+
+      {/* Live admin controls */}
+      <LiveAdminControls
+        initialSettings={adminSettings}
+        initialGameOverrides={gameOverrides}
+        todayGames={todayGames}
+        budget={budget}
+      />
 
       {/* Sync */}
       <SyncButton />

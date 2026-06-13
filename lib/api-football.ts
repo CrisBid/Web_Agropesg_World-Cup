@@ -42,10 +42,13 @@ function countTodayGames(): number {
   return GAMES.filter((g) => g.date.startsWith(todayStr)).length;
 }
 
-export function computeBudget(): BudgetInfo {
+export function computeBudget(reqPerGameOverride?: number | null): BudgetInfo {
   const todayGames = Math.max(1, countTodayGames());
   const available  = DAILY_BUDGET - SAFETY_MARGIN; // 92
-  const reqPerGame = Math.min(45, Math.max(8, Math.floor(available / todayGames)));
+  const autoReqPerGame = Math.min(45, Math.max(8, Math.floor(available / todayGames)));
+  const reqPerGame = reqPerGameOverride != null
+    ? Math.min(92, Math.max(1, reqPerGameOverride))
+    : autoReqPerGame;
 
   // Allocate: 65% live, 35% stats
   const liveReq  = Math.max(4, Math.floor(reqPerGame * 0.65));
@@ -272,12 +275,19 @@ function mapFixture(f: any, knockoutTeams?: Record<number, { teamA: string; team
   };
 }
 
-export async function getLiveMatches(): Promise<LiveMatch[]> {
+export async function getLiveMatches(opts?: {
+  reqPerGameOverride?: number | null;
+  disabledGameIds?: Set<number>;
+}): Promise<LiveMatch[]> {
   const now = Date.now();
 
-  const { liveTTL } = computeBudget();
+  const { liveTTL } = computeBudget(opts?.reqPerGameOverride);
   if (liveCache && now - liveCache.fetchedAt < liveTTL) {
-    return liveCache.matches;
+    const cached = liveCache.matches;
+    if (opts?.disabledGameIds?.size) {
+      return cached.filter((m) => m.gameId == null || !opts.disabledGameIds!.has(m.gameId));
+    }
+    return cached;
   }
 
   // Don't burn a request if no game should be live right now
@@ -306,6 +316,9 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
       .map((f: any) => mapFixture(f, knockoutTeams));
 
     liveCache = { matches, fetchedAt: now };
+    if (opts?.disabledGameIds?.size) {
+      return matches.filter((m) => m.gameId == null || !opts.disabledGameIds!.has(m.gameId));
+    }
     return matches;
   } catch (err) {
     console.error("[live] fetch error:", err);
@@ -350,9 +363,18 @@ export async function getMatchStats(fixtureId: number): Promise<LiveStats | null
 
 // ─── Combined live data with stats ────────────────────────────────────────
 
-export async function getLiveMatchesWithStats(): Promise<LiveMatch[]> {
-  const matches = await getLiveMatches();
+export async function getLiveMatchesWithStats(opts?: {
+  reqPerGameOverride?: number | null;
+  statsEnabled?: boolean;
+  disabledGameIds?: Set<number>;
+}): Promise<LiveMatch[]> {
+  const matches = await getLiveMatches({
+    reqPerGameOverride: opts?.reqPerGameOverride,
+    disabledGameIds: opts?.disabledGameIds,
+  });
   if (matches.length === 0) return [];
+
+  if (opts?.statsEnabled === false) return matches;
 
   // Fetch stats in parallel for all live games (each cached independently)
   const withStats = await Promise.all(

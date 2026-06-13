@@ -1,4 +1,4 @@
-import { getParticipants, getResults, getPredictions, getLiveScoreEnabled } from "@/lib/data";
+import { getParticipants, getResults, getPredictions, getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import { getLiveMatches, computeBudget } from "@/lib/api-football";
@@ -8,14 +8,28 @@ import type { Phase } from "@/lib/games-data";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const budget = computeBudget();
+  const [enabled, adminSettings, gameOverrides] = await Promise.all([
+    getLiveScoreEnabled(),
+    getLiveAdminSettings(),
+    getLiveGameOverrides(),
+  ]);
 
-  const enabled = await getLiveScoreEnabled();
+  const budget = computeBudget(adminSettings.liveMaxReqPerGame);
+
   if (!enabled) {
     return Response.json({ live: false, disabled: true, ranking: [], clientPollMs: budget.clientPollMs });
   }
 
-  const liveMatches = await getLiveMatches();
+  const disabledGameIds = new Set(
+    Object.entries(gameOverrides)
+      .filter(([, v]) => !v)
+      .map(([k]) => Number(k))
+  );
+
+  const liveMatches = await getLiveMatches({
+    reqPerGameOverride: adminSettings.liveMaxReqPerGame,
+    disabledGameIds,
+  });
 
   if (liveMatches.length === 0) {
     return Response.json({ live: false, ranking: [], clientPollMs: budget.clientPollMs });
