@@ -1,9 +1,14 @@
 import Link from "next/link";
-import { getParticipants, getResults } from "@/lib/data";
+import { getParticipants, getResults, getLiveScoreEnabled } from "@/lib/data";
 import SyncButton from "./SyncButton";
+import LiveToggle from "./LiveToggle";
 
 export default async function AdminPage() {
-  const [participants, results] = await Promise.all([getParticipants(), getResults()]);
+  const [participants, results, liveEnabled] = await Promise.all([
+    getParticipants(),
+    getResults(),
+    getLiveScoreEnabled(),
+  ]);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
 
   const cards = [
@@ -60,6 +65,9 @@ export default async function AdminPage() {
           </Link>
         ))}
       </div>
+
+      {/* Live score toggle */}
+      <LiveToggle initialEnabled={liveEnabled} />
 
       {/* Sync */}
       <SyncButton />

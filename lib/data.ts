@@ -215,3 +215,18 @@ export async function saveResults(results: ActualResults): Promise<void> {
     create: { id: 1, champion: results.champion, thirdPlace: results.thirdPlace },
   });
 }
+
+// ─── Live Score Toggle ────────────────────────────────────────────────────────
+
+export async function getLiveScoreEnabled(): Promise<boolean> {
+  const settings = await prisma.tournamentSettings.findUnique({ where: { id: 1 } });
+  return settings?.liveScoreEnabled ?? true;
+}
+
+export async function setLiveScoreEnabled(enabled: boolean): Promise<void> {
+  await prisma.tournamentSettings.upsert({
+    where: { id: 1 },
+    update: { liveScoreEnabled: enabled },
+    create: { id: 1, liveScoreEnabled: enabled },
+  });
+}

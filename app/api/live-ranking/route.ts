@@ -1,4 +1,4 @@
-import { getParticipants, getResults, getPredictions } from "@/lib/data";
+import { getParticipants, getResults, getPredictions, getLiveScoreEnabled } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import { getLiveMatches, computeBudget } from "@/lib/api-football";
@@ -9,6 +9,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const budget = computeBudget();
+
+  const enabled = await getLiveScoreEnabled();
+  if (!enabled) {
+    return Response.json({ live: false, disabled: true, ranking: [], clientPollMs: budget.clientPollMs });
+  }
+
   const liveMatches = await getLiveMatches();
 
   if (liveMatches.length === 0) {

@@ -1,7 +1,16 @@
 import { getLiveMatchesWithStats, isAnyGameExpectedLive, computeBudget } from "@/lib/api-football";
+import { getLiveScoreEnabled } from "@/lib/data";
 
 export async function GET() {
   const budget = computeBudget();
+
+  const enabled = await getLiveScoreEnabled();
+  if (!enabled) {
+    return Response.json(
+      { matches: [], expected: false, disabled: true, budget },
+      { headers: { "Cache-Control": "public, max-age=30" } }
+    );
+  }
 
   if (!isAnyGameExpectedLive()) {
     return Response.json(

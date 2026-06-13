@@ -73,9 +73,10 @@ model KnockoutTeam {
 }
 
 model TournamentSettings {
-  id         Int     @id @default(1)
-  champion   String?
-  thirdPlace String?
+  id               Int     @id @default(1)
+  champion         String?
+  thirdPlace       String?
+  liveScoreEnabled Boolean @default(true)
 
   @@map("tournament_settings")
 }
