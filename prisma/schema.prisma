@@ -73,12 +73,13 @@ model KnockoutTeam {
 }
 
 model TournamentSettings {
-  id                Int     @id @default(1)
-  champion          String?
-  thirdPlace        String?
-  liveScoreEnabled  Boolean @default(true)
-  liveStatsEnabled  Boolean @default(true)
-  liveMaxReqPerGame Int?
+  id                  Int     @id @default(1)
+  champion            String?
+  thirdPlace          String?
+  liveScoreEnabled    Boolean @default(true)
+  liveStatsEnabled    Boolean @default(true)
+  liveMaxReqPerGame   Int?
+  liveBannerTestMode  String?
 
   @@map("tournament_settings")
 }

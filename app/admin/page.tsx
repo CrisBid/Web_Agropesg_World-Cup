@@ -3,13 +3,21 @@ import { getParticipants, getResults, getLiveScoreEnabled, getLiveAdminSettings,
 import { GAMES } from "@/lib/games-data";
 import { computeBudget } from "@/lib/api-football";
 import SyncButton from "./SyncButton";
+import type { PendingGame } from "./SyncButton";
 import LiveToggle from "./LiveToggle";
 import LiveAdminControls from "./LiveAdminControls";
+import LiveBannerTest from "./LiveBannerTest";
 
-function todayBRT(): string {
+function nowBRT(): { today: string; nowMs: number } {
   const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
-  return brt.toISOString().slice(0, 10);
+  return { today: brt.toISOString().slice(0, 10), nowMs: Date.now() };
 }
+
+// A game is "pending result" when it should have ended but has no result in DB yet.
+// We assume a game ends ~115 min after kickoff (90 min + 15 stoppage + 10 min buffer).
+const GAME_END_BUFFER_MS = 115 * 60 * 1000;
+// Stop watching after 30 min past the expected end (prevent infinite retry).
+const MAX_WATCH_MS = 30 * 60 * 1000;
 
 export default async function AdminPage() {
   const [participants, results, liveEnabled, adminSettings, gameOverrides] = await Promise.all([
@@ -21,7 +29,23 @@ export default async function AdminPage() {
   ]);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
 
-  const today = todayBRT();
+  const { today, nowMs } = nowBRT();
+
+  // Games today that ended but have no result yet
+  const pendingGames: PendingGame[] = GAMES
+    .filter((g) => g.date.slice(0, 10) === today)
+    .filter((g) => {
+      const kickoffMs = new Date(g.date + ":00-03:00").getTime();
+      const expectedEnd = kickoffMs + GAME_END_BUFFER_MS;
+      const isExpectedFinished = nowMs > expectedEnd;
+      const isWithinWindow = nowMs < expectedEnd + MAX_WATCH_MS;
+      const hasResult = g.phase === "grupos"
+        ? results.groups[g.id] !== undefined
+        : results.knockout[g.id] !== undefined;
+      return isExpectedFinished && isWithinWindow && !hasResult;
+    })
+    .map((g) => ({ id: g.id, teamA: g.teamA, teamB: g.teamB, time: g.date.slice(11, 16) }));
+
   const todayGames = GAMES
     .filter((g) => g.date.slice(0, 10) === today)
     .map((g) => ({
@@ -91,6 +115,9 @@ export default async function AdminPage() {
       {/* Live score global toggle */}
       <LiveToggle initialEnabled={liveEnabled} />
 
+      {/* Live banner test mode */}
+      <LiveBannerTest initialMode={adminSettings.liveBannerTestMode} />
+
       {/* Live admin controls */}
       <LiveAdminControls
         initialSettings={adminSettings}
@@ -100,7 +127,7 @@ export default async function AdminPage() {
       />
 
       {/* Sync */}
-      <SyncButton />
+      <SyncButton pendingGames={pendingGames} />
 
       {/* Quick links */}
       {participants.length > 0 && (

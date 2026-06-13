@@ -276,9 +276,12 @@ export async function setLiveScoreEnabled(enabled: boolean): Promise<void> {
 
 // ─── Live Admin Settings ──────────────────────────────────────────────────────
 
+export type LiveBannerTestMode = "pre" | "live" | "post" | null;
+
 export interface LiveAdminSettings {
   liveStatsEnabled: boolean;
   liveMaxReqPerGame: number | null;
+  liveBannerTestMode: LiveBannerTestMode;
 }
 
 export async function getLiveAdminSettings(): Promise<LiveAdminSettings> {
@@ -286,20 +289,25 @@ export async function getLiveAdminSettings(): Promise<LiveAdminSettings> {
   return {
     liveStatsEnabled: s?.liveStatsEnabled ?? true,
     liveMaxReqPerGame: s?.liveMaxReqPerGame ?? null,
+    liveBannerTestMode: (s?.liveBannerTestMode as LiveBannerTestMode) ?? null,
   };
 }
 
-export async function setLiveAdminSettings(settings: LiveAdminSettings): Promise<void> {
+export async function setLiveAdminSettings(settings: Partial<LiveAdminSettings>): Promise<void> {
+  const current = await getLiveAdminSettings();
+  const next = { ...current, ...settings };
   await prisma.tournamentSettings.upsert({
     where: { id: 1 },
     update: {
-      liveStatsEnabled: settings.liveStatsEnabled,
-      liveMaxReqPerGame: settings.liveMaxReqPerGame,
+      liveStatsEnabled: next.liveStatsEnabled,
+      liveMaxReqPerGame: next.liveMaxReqPerGame,
+      liveBannerTestMode: next.liveBannerTestMode,
     },
     create: {
       id: 1,
-      liveStatsEnabled: settings.liveStatsEnabled,
-      liveMaxReqPerGame: settings.liveMaxReqPerGame,
+      liveStatsEnabled: next.liveStatsEnabled,
+      liveMaxReqPerGame: next.liveMaxReqPerGame,
+      liveBannerTestMode: next.liveBannerTestMode,
     },
   });
 }

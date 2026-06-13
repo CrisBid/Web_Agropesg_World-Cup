@@ -15,7 +15,41 @@ export async function GET() {
   ]);
 
   const budget = computeBudget(adminSettings.liveMaxReqPerGame);
+  const testMode = adminSettings.liveBannerTestMode;
 
+  // ── Test mode: fabricate a live ranking ───────────────────────────────────
+  if (testMode === "live" || testMode === "post") {
+    const [participants, finalResults] = await Promise.all([getParticipants(), getResults()]);
+    const gamesPhaseMap: Record<number, Phase> = {};
+    for (const g of GAMES) gamesPhaseMap[g.id] = g.phase;
+
+    const baseRanking = await Promise.all(
+      participants.map(async (p) => {
+        const predictions = await getPredictions(p.id);
+        const { total } = calcTotalPoints(predictions, finalResults, gamesPhaseMap);
+        return { id: p.id, name: p.name, base: total };
+      })
+    );
+    baseRanking.sort((a, b) => b.base - a.base);
+
+    // Fabricate deltas: 1st gets +3, 2nd +2, 3rd +1, rest -1 (just for visual demo)
+    const DEMO_DELTAS = [3, 2, 1, 0, -1, -1, -2];
+    const ranking = baseRanking.map((p, i) => ({
+      id: p.id,
+      name: p.name,
+      base: p.base,
+      live: p.base + (DEMO_DELTAS[i] ?? -1),
+      delta: DEMO_DELTAS[i] ?? -1,
+    }));
+    ranking.sort((a, b) => b.live - a.live);
+
+    if (testMode === "post") {
+      return Response.json({ live: false, postGame: true, ranking, clientPollMs: budget.clientPollMs });
+    }
+    return Response.json({ live: true, ranking, clientPollMs: budget.clientPollMs });
+  }
+
+  // ── Normal mode ──────────────────────────────────────────────────────────
   if (!enabled) {
     return Response.json({ live: false, disabled: true, ranking: [], clientPollMs: budget.clientPollMs });
   }
@@ -37,7 +71,6 @@ export async function GET() {
 
   const [participants, finalResults] = await Promise.all([getParticipants(), getResults()]);
 
-  // Build merged results: finalized + live overlay (treated as if already final)
   const merged: ActualResults = {
     ...finalResults,
     groups:   { ...finalResults.groups },

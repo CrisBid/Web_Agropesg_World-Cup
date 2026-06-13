@@ -1,4 +1,5 @@
 import { getLiveAdminSettings, setLiveAdminSettings } from "@/lib/data";
+import type { LiveBannerTestMode } from "@/lib/data";
 
 export async function GET() {
   const settings = await getLiveAdminSettings();
@@ -7,21 +8,21 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const liveStatsEnabled = typeof body.liveStatsEnabled === "boolean" ? body.liveStatsEnabled : undefined;
-  const liveMaxReqPerGame =
-    body.liveMaxReqPerGame === null ? null
-    : typeof body.liveMaxReqPerGame === "number" ? body.liveMaxReqPerGame
-    : undefined;
+  const patch: Parameters<typeof setLiveAdminSettings>[0] = {};
 
-  if (liveStatsEnabled === undefined && liveMaxReqPerGame === undefined) {
+  if (typeof body.liveStatsEnabled === "boolean") patch.liveStatsEnabled = body.liveStatsEnabled;
+  if (body.liveMaxReqPerGame === null) patch.liveMaxReqPerGame = null;
+  else if (typeof body.liveMaxReqPerGame === "number") patch.liveMaxReqPerGame = body.liveMaxReqPerGame;
+
+  const validTestModes: LiveBannerTestMode[] = ["pre", "live", "post", null];
+  if (validTestModes.includes(body.liveBannerTestMode)) {
+    patch.liveBannerTestMode = body.liveBannerTestMode as LiveBannerTestMode;
+  }
+
+  if (Object.keys(patch).length === 0) {
     return Response.json({ error: "No valid fields" }, { status: 400 });
   }
 
-  const current = await getLiveAdminSettings();
-  await setLiveAdminSettings({
-    liveStatsEnabled: liveStatsEnabled ?? current.liveStatsEnabled,
-    liveMaxReqPerGame: liveMaxReqPerGame !== undefined ? liveMaxReqPerGame : current.liveMaxReqPerGame,
-  });
-
+  await setLiveAdminSettings(patch);
   return Response.json({ ok: true });
 }
