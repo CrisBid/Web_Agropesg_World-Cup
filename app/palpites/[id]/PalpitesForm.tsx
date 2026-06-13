@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, BRACKET, FASE32_GROUPS, THIRD_PLACE_SLOTS } from "@/lib/games-data";
+import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, BRACKET, FASE32_GROUPS } from "@/lib/games-data";
+import { ANNEX_C } from "@/lib/annex-c";
 import type { Phase, Game } from "@/lib/games-data";
 import type { ParticipantPredictions, ActualResults } from "@/lib/scoring";
 
@@ -14,6 +15,7 @@ const PHASE_PTS: Record<Phase, number> = {
 };
 
 interface Standing { team: string; J: number; V: number; E: number; D: number; GP: number; GC: number; SG: number; Pts: number }
+interface ThirdQ { team: string; group: string; Pts: number; SG: number; GP: number }
 
 function calcGroupStandings(
   group: string,
@@ -153,13 +155,10 @@ export default function PalpitesForm({ participantId, initialPredictions, result
     allGroupStandings[g] = calcGroupStandings(g, predictions.groups);
   }
 
-  // 8 best predicted 3rd-place finishers, ranked by Pts → SG → GP
-  // Only includes groups where the user has filled at least one match prediction
-  const predictedThirdQ: string[] = Object.keys(GROUPS)
-    .map((g) => { const s = allGroupStandings[g]; return s[2] ?? null; })
-    .filter((x): x is Standing => x !== null && x.J > 0)
+  // 8 best predicted 3rd-place finishers ranked by Pts → SG → GP, tracking their source group
+  const predictedThirdQ: ThirdQ[] = Object.keys(GROUPS)
+    .flatMap((g) => { const t = allGroupStandings[g][2]; return t && t.J > 0 ? [{ team: t.team, group: g, Pts: t.Pts, SG: t.SG, GP: t.GP }] : []; })
     .sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP)
-    .map((t) => t.team)
     .slice(0, 8);
 
   function getWinnerOf(gameId: number): string {
@@ -171,19 +170,25 @@ export default function PalpitesForm({ participantId, initialPredictions, result
     const admin = results.knockoutTeams?.[gameId];
     if (admin?.teamA && admin.teamA !== "TBD") return { teamA: admin.teamA, teamB: admin.teamB };
 
-    // Fase de 32 (games 73-88) — official Copa 2026 bracket
+    // Fase de 32 (games 73-88) — official Copa 2026 bracket with FIFA Annex C logic
     const codes = FASE32_GROUPS[gameId];
     if (codes) {
-      const resolve = (code: string): string => {
+      const resolve = (code: string, otherCode: string): string => {
         if (code === "3rd") {
-          const idx = THIRD_PLACE_SLOTS.indexOf(gameId);
-          return idx >= 0 ? (predictedThirdQ[idx] ?? "TBD") : "TBD";
+          if (predictedThirdQ.length < 8) return "TBD";
+          // Build Annex C key from the 8 qualifying group letters, sorted alphabetically
+          const qualifyingKey = predictedThirdQ.map(q => q.group).sort().join("");
+          const annexEntry = ANNEX_C[qualifyingKey];
+          if (!annexEntry) return "TBD";
+          // otherCode is e.g. "1E" → group winner letter is "E"
+          const thirdPlaceGroup = annexEntry[otherCode[1]];
+          return predictedThirdQ.find(q => q.group === thirdPlaceGroup)?.team ?? "TBD";
         }
         const pos = Number(code[0]) - 1;
         const grp = code[1];
         return allGroupStandings[grp]?.[pos]?.team ?? "TBD";
       };
-      return { teamA: resolve(codes[0]), teamB: resolve(codes[1]) };
+      return { teamA: resolve(codes[0], codes[1]), teamB: resolve(codes[1], codes[0]) };
     }
 
     // 3rd-place match: losers of the two semis (game 103)
