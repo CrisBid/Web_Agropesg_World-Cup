@@ -19,6 +19,7 @@ interface LiveRankingResponse {
 
 interface Props {
   baseRanking: { id: string; name: string; total: number }[];
+  onLiveChange?: (isLive: boolean) => void;
 }
 
 const PRIZES_CENTS = [220000, 80000, 50000, 20000, 10000];
@@ -47,7 +48,7 @@ function calcPrizes(ranking: { live: number }[]): (number | null)[] {
 
 const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉", 4: "4️⃣", 5: "5️⃣" };
 
-export default function LiveRanking({ baseRanking }: Props) {
+export default function LiveRanking({ baseRanking, onLiveChange }: Props) {
   const [data, setData] = useState<LiveRankingResponse | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
@@ -61,7 +62,10 @@ export default function LiveRanking({ baseRanking }: Props) {
         if (res.ok && !cancelled) {
           const json: LiveRankingResponse = await res.json();
           setData(json);
-          if (json.live) setLastUpdate(new Date());
+          if (json.live) {
+            setLastUpdate(new Date());
+            onLiveChange?.(true);
+          }
           const delay = Math.max(30_000, json.clientPollMs ?? 60_000);
           setTimeout(poll, delay);
         } else if (!cancelled) {

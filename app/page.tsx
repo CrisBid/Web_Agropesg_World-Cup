@@ -3,6 +3,14 @@ import { getParticipants, getResults, getPredictions } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
+import GamesSection from "@/app/components/GamesSection";
+import type { GameGroup } from "@/app/components/GamesSection";
+
+function todayBRT(): string {
+  const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  return brt.toISOString().slice(0, 10);
+}
+
 
 const PRIZES_CENTS = [220000, 80000, 50000, 20000, 10000];
 
@@ -98,6 +106,35 @@ export default async function Home() {
     a.name.localeCompare(b.name, "pt-BR")
   );
 
+  // Jogos: hoje + próximos 2 dias, agrupados por data
+  const today = todayBRT();
+  const playedIds = new Set([
+    ...Object.keys(results.groups).map(Number),
+    ...Object.keys(results.knockout).map(Number),
+  ]);
+
+  const distinctDates = [...new Set(
+    GAMES
+      .filter((g) => g.date.slice(0, 10) >= today && !playedIds.has(g.id))
+      .map((g) => g.date.slice(0, 10))
+  )].sort().slice(0, 3); // hoje + próximos 2 dias
+
+  const gamesByDate: GameGroup[] = distinctDates.map((date) => {
+    const isToday = date === today;
+    const [year, month, day] = date.split("-").map(Number);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    const label = `${days[d.getUTCDay()]}, ${day} de ${months[month - 1]}`;
+    const games = GAMES
+      .filter((g) => g.date.slice(0, 10) === date && !playedIds.has(g.id))
+      .map((g) => ({
+        ...g,
+        result: (g.phase === "grupos" ? results.groups[g.id] : results.knockout[g.id]) ?? undefined,
+      }));
+    return { date, isToday, label, games };
+  });
+
   return (
     <div className="space-y-12">
 
@@ -139,6 +176,9 @@ export default async function Home() {
           )}
         </div>
       </section>
+
+      {/* ── JOGOS ── */}
+      <GamesSection groups={gamesByDate} />
 
       {/* ── PÓDIO ── */}
       {positionGroups.length > 0 && (
