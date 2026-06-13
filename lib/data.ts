@@ -216,6 +216,49 @@ export async function saveResults(results: ActualResults): Promise<void> {
   });
 }
 
+// ─── Game Prediction Stats ───────────────────────────────────────────────────
+
+export interface GamePredictionStats {
+  total: number;
+  homeWins: number;
+  draws: number;
+  awayWins: number;
+  topScores: { scoreA: number; scoreB: number; count: number }[];
+  othersCount: number;
+}
+
+export async function getGroupGameStats(gameId: number): Promise<GamePredictionStats> {
+  const rows = await prisma.groupPrediction.findMany({
+    where: { gameId, scoreA: { not: null }, scoreB: { not: null } },
+  });
+
+  const total = rows.length;
+  if (total === 0) return { total: 0, homeWins: 0, draws: 0, awayWins: 0, topScores: [], othersCount: 0 };
+
+  let homeWins = 0, draws = 0, awayWins = 0;
+  const scoreMap = new Map<string, number>();
+
+  for (const r of rows) {
+    const a = r.scoreA!, b = r.scoreB!;
+    if (a > b) homeWins++;
+    else if (a === b) draws++;
+    else awayWins++;
+    const key = `${a}-${b}`;
+    scoreMap.set(key, (scoreMap.get(key) ?? 0) + 1);
+  }
+
+  const sorted = Array.from(scoreMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, count]) => {
+      const [scoreA, scoreB] = key.split("-").map(Number);
+      return { scoreA, scoreB, count };
+    });
+
+  const topScores = sorted.slice(0, 3);
+  const othersCount = total - topScores.reduce((s, e) => s + e.count, 0);
+  return { total, homeWins, draws, awayWins, topScores, othersCount };
+}
+
 // ─── Live Score Toggle ────────────────────────────────────────────────────────
 
 export async function getLiveScoreEnabled(): Promise<boolean> {

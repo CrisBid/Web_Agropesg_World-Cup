@@ -1,10 +1,11 @@
-import { getParticipants, getResults, getPredictions } from "@/lib/data";
+import { getParticipants, getResults, getPredictions, getGroupGameStats } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
 import Link from "next/link";
-import GameCard from "@/app/components/GameCard";
 import RankingSection, { type RankingEntry } from "./RankingSection";
+import TodayGames from "./TodayGames";
+import type { TodayGameItem } from "./TodayGames";
 
 function todayBRT(): string {
   const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -55,6 +56,14 @@ export default async function RankingPage() {
   const today = todayBRT();
   const todaysGames = GAMES.filter((g) => g.date.slice(0, 10) === today);
 
+  const todayItems: TodayGameItem[] = await Promise.all(
+    todaysGames.map(async (g) => {
+      const stats = g.phase === "grupos" ? await getGroupGameStats(g.id) : { total: 0, homeWins: 0, draws: 0, awayWins: 0, topScores: [], othersCount: 0 };
+      const result = g.phase === "grupos" ? results.groups[g.id] : results.knockout[g.id];
+      return { game: g, result: result ?? null, stats };
+    })
+  );
+
   return (
     <div className="space-y-8">
 
@@ -77,36 +86,7 @@ export default async function RankingPage() {
       </div>
 
       {/* Jogos do dia */}
-      {todaysGames.length > 0 && (
-        <div className="rounded-[20px] border p-5 space-y-3"
-          style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.15em]" style={{ color: "#5a5a5a" }}>
-              Jogos de Hoje
-            </p>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: "rgba(220,38,38,0.12)", color: "#dc2626" }}>
-              {todaysGames.length} jogo{todaysGames.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {todaysGames.map((g) => (
-              <GameCard
-                key={g.id}
-                game={g}
-                result={
-                  (g.phase === "grupos" ? results.groups[g.id] : results.knockout[g.id]) ?? undefined
-                }
-                compact
-              />
-            ))}
-          </div>
-          <Link href="/calendario" className="block text-right text-xs font-semibold transition-colors hover:opacity-70"
-            style={{ color: "#2d6a4f" }}>
-            Ver calendário completo →
-          </Link>
-        </div>
-      )}
+      <TodayGames items={todayItems} />
 
       {/* Tabela de prêmios */}
       <div className="rounded-[20px] border p-5" style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
