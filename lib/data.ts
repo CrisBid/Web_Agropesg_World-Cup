@@ -306,17 +306,27 @@ export async function setLiveAdminSettings(settings: LiveAdminSettings): Promise
 
 // ─── Per-game live overrides ──────────────────────────────────────────────────
 
-export async function getLiveGameOverrides(): Promise<Record<number, boolean>> {
+export interface GameOverrideEntry {
+  liveEnabled: boolean;
+  reqPerGame: number | null;
+}
+
+export async function getLiveGameOverrides(): Promise<Record<number, GameOverrideEntry>> {
   const rows = await prisma.liveGameOverride.findMany();
-  const result: Record<number, boolean> = {};
-  for (const r of rows) result[r.gameId] = r.liveEnabled;
+  const result: Record<number, GameOverrideEntry> = {};
+  for (const r of rows) result[r.gameId] = { liveEnabled: r.liveEnabled, reqPerGame: r.reqPerGame ?? null };
   return result;
 }
 
-export async function setLiveGameOverride(gameId: number, enabled: boolean): Promise<void> {
+export async function setLiveGameOverride(gameId: number, patch: Partial<GameOverrideEntry>): Promise<void> {
+  const existing = await prisma.liveGameOverride.findUnique({ where: { gameId } });
   await prisma.liveGameOverride.upsert({
     where: { gameId },
-    update: { liveEnabled: enabled },
-    create: { gameId, liveEnabled: enabled },
+    update: patch,
+    create: {
+      gameId,
+      liveEnabled: patch.liveEnabled ?? existing?.liveEnabled ?? true,
+      reqPerGame: patch.reqPerGame !== undefined ? patch.reqPerGame : (existing?.reqPerGame ?? null),
+    },
   });
 }

@@ -86,6 +86,7 @@ model TournamentSettings {
 model LiveGameOverride {
   gameId      Int     @id
   liveEnabled Boolean @default(true)
+  reqPerGame  Int?
 
   @@map("live_game_overrides")
 }

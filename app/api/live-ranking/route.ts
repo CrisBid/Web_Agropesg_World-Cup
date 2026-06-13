@@ -22,7 +22,7 @@ export async function GET() {
 
   const disabledGameIds = new Set(
     Object.entries(gameOverrides)
-      .filter(([, v]) => !v)
+      .filter(([, v]) => !v.liveEnabled)
       .map(([k]) => Number(k))
   );
 

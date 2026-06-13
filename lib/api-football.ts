@@ -328,11 +328,12 @@ export async function getLiveMatches(opts?: {
 
 // ─── Match statistics ──────────────────────────────────────────────────────
 
-export async function getMatchStats(fixtureId: number): Promise<LiveStats | null> {
+export async function getMatchStats(fixtureId: number, statsTTLOverride?: number): Promise<LiveStats | null> {
   const now = Date.now();
   const { statsTTL } = computeBudget();
+  const effectiveTTL = statsTTLOverride ?? statsTTL;
   const cached = statsCache.get(fixtureId);
-  if (cached && now - cached.fetchedAt < statsTTL) return cached.stats;
+  if (cached && now - cached.fetchedAt < effectiveTTL) return cached.stats;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -367,6 +368,7 @@ export async function getLiveMatchesWithStats(opts?: {
   reqPerGameOverride?: number | null;
   statsEnabled?: boolean;
   disabledGameIds?: Set<number>;
+  perGameReqOverrides?: Record<number, number>; // gameId → reqPerGame override
 }): Promise<LiveMatch[]> {
   const matches = await getLiveMatches({
     reqPerGameOverride: opts?.reqPerGameOverride,
@@ -376,10 +378,14 @@ export async function getLiveMatchesWithStats(opts?: {
 
   if (opts?.statsEnabled === false) return matches;
 
-  // Fetch stats in parallel for all live games (each cached independently)
+  // Fetch stats in parallel; per-game reqPerGame → individual statsTTL
   const withStats = await Promise.all(
     matches.map(async (m) => {
-      const stats = await getMatchStats(m.fixtureId);
+      let statsTTLOverride: number | undefined;
+      if (m.gameId != null && opts?.perGameReqOverrides?.[m.gameId] != null) {
+        statsTTLOverride = computeBudget(opts.perGameReqOverrides[m.gameId]).statsTTL;
+      }
+      const stats = await getMatchStats(m.fixtureId, statsTTLOverride);
       return { ...m, stats };
     })
   );

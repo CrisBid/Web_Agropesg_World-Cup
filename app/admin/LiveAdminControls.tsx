@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { LiveAdminSettings } from "@/lib/data";
+import type { LiveAdminSettings, GameOverrideEntry } from "@/lib/data";
 
 interface TodayGame {
   id: number;
   teamA: string;
   teamB: string;
   time: string;
-  liveEnabled: boolean;
 }
 
 interface BudgetInfo {
@@ -21,7 +20,7 @@ interface BudgetInfo {
 
 interface Props {
   initialSettings: LiveAdminSettings;
-  initialGameOverrides: Record<number, boolean>;
+  initialGameOverrides: Record<number, GameOverrideEntry>;
   todayGames: TodayGame[];
   budget: BudgetInfo;
 }
@@ -33,9 +32,123 @@ function fmtMs(ms: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
+function computeStatsTTL(reqPerGame: number): number {
+  const GAME_DURATION = 105 * 60_000;
+  const liveReq = Math.max(4, Math.floor(reqPerGame * 0.65));
+  const statsReq = Math.max(3, reqPerGame - liveReq);
+  return Math.floor(GAME_DURATION / statsReq);
+}
+
+function GameRow({
+  game,
+  entry,
+  globalReqPerGame,
+  onToggle,
+  onReqChange,
+}: {
+  game: TodayGame;
+  entry: GameOverrideEntry;
+  globalReqPerGame: number;
+  onToggle: (enabled: boolean) => void;
+  onReqChange: (req: number | null) => void;
+}) {
+  const [reqInput, setReqInput] = useState(entry.reqPerGame != null ? String(entry.reqPerGame) : "");
+  const [pending, startTransition] = useTransition();
+
+  const effectiveReq = entry.reqPerGame ?? globalReqPerGame;
+  const statsTTL = computeStatsTTL(effectiveReq);
+  const isOverriding = entry.reqPerGame != null;
+
+  function applyReq() {
+    const val = reqInput.trim();
+    startTransition(() => {
+      onReqChange(val === "" ? null : Math.min(92, Math.max(1, parseInt(val, 10))));
+    });
+  }
+
+  return (
+    <div
+      className="rounded-[14px] border p-4 space-y-3"
+      style={{
+        borderColor: entry.liveEnabled ? "rgba(27,67,50,0.10)" : "rgba(220,38,38,0.20)",
+        backgroundColor: entry.liveEnabled ? "white" : "rgba(220,38,38,0.03)",
+      }}
+    >
+      {/* Game header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
+            {game.teamA} <span style={{ color: "#9a9a9a" }}>vs</span> {game.teamB}
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: "#9a9a9a" }}>
+            {game.time}h · jogo #{game.id}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {!entry.liveEnabled && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: "rgba(220,38,38,0.10)", color: "#dc2626" }}>
+              desativado
+            </span>
+          )}
+          <button
+            onClick={() => onToggle(!entry.liveEnabled)}
+            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+            style={{ backgroundColor: entry.liveEnabled ? "#52b788" : "#d1d5db" }}
+          >
+            <span
+              className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+              style={{ transform: entry.liveEnabled ? "translateX(1.375rem)" : "translateX(0.125rem)" }}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Per-game req override */}
+      {entry.liveEnabled && (
+        <div className="flex items-center justify-between gap-3 pt-2"
+          style={{ borderTop: "1px solid rgba(27,67,50,0.06)" }}>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold" style={{ color: "#5a5a5a" }}>
+              Requisições de stats
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: "#9a9a9a" }}>
+              {isOverriding
+                ? `Manual: ${entry.reqPerGame} req → stats a cada ${fmtMs(statsTTL)}`
+                : `Global: ${globalReqPerGame} req → stats a cada ${fmtMs(statsTTL)}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="number"
+              min={1}
+              max={92}
+              value={reqInput}
+              onChange={(e) => setReqInput(e.target.value)}
+              placeholder="global"
+              disabled={pending}
+              className="w-20 rounded-[10px] border px-3 py-1.5 text-sm font-bold text-center tabular-nums outline-none"
+              style={{ borderColor: isOverriding ? "#52b788" : "rgba(27,67,50,0.15)", color: "#1b4332" }}
+            />
+            <button
+              onClick={applyReq}
+              disabled={pending}
+              className="rounded-[10px] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: "#1b4332" }}
+            >
+              {pending ? "…" : "OK"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LiveAdminControls({ initialSettings, initialGameOverrides, todayGames, budget: initialBudget }: Props) {
   const [settings, setSettings] = useState(initialSettings);
-  const [gameOverrides, setGameOverrides] = useState<Record<number, boolean>>(initialGameOverrides);
+  const [gameOverrides, setGameOverrides] = useState<Record<number, GameOverrideEntry>>(initialGameOverrides);
   const [reqInput, setReqInput] = useState(
     initialSettings.liveMaxReqPerGame != null ? String(initialSettings.liveMaxReqPerGame) : ""
   );
@@ -54,8 +167,7 @@ export default function LiveAdminControls({ initialSettings, initialGameOverride
     });
 
     if (res.ok) {
-      // Recompute budget display
-      const budgetRes = await fetch("/api/live?_budgetOnly=1", { cache: "no-store" });
+      const budgetRes = await fetch("/api/live", { cache: "no-store" });
       if (budgetRes.ok) {
         const data = await budgetRes.json();
         if (data.budget) setBudget(data.budget);
@@ -67,20 +179,25 @@ export default function LiveAdminControls({ initialSettings, initialGameOverride
     setTimeout(() => setFeedback(null), 2000);
   }
 
-  function handleReqOverride() {
+  function handleGlobalReqOverride() {
     const val = reqInput.trim();
     startTransition(async () => {
       await patchSettings({ liveMaxReqPerGame: val === "" ? null : Math.max(1, Math.min(92, parseInt(val, 10))) });
     });
   }
 
-  async function toggleGameOverride(gameId: number, enabled: boolean) {
-    setGameOverrides((prev) => ({ ...prev, [gameId]: enabled }));
+  async function patchGameOverride(gameId: number, patch: Partial<GameOverrideEntry>) {
+    setGameOverrides((prev) => ({
+      ...prev,
+      [gameId]: { ...prev[gameId] ?? { liveEnabled: true, reqPerGame: null }, ...patch },
+    }));
     await fetch("/api/admin/live-game-override", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameId, enabled }),
+      body: JSON.stringify({ gameId, ...patch }),
     });
+    setFeedback("Salvo");
+    setTimeout(() => setFeedback(null), 2000);
   }
 
   const isAutoReq = settings.liveMaxReqPerGame == null;
@@ -110,14 +227,14 @@ export default function LiveAdminControls({ initialSettings, initialGameOverride
       <div className="rounded-[14px] p-4 space-y-3"
         style={{ backgroundColor: "rgba(27,67,50,0.03)", border: "1px solid rgba(27,67,50,0.08)" }}>
         <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9a9a9a" }}>
-          Orçamento atual (100 req/dia)
+          Orçamento global (100 req/dia)
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "Jogos hoje", value: String(budget.todayGames) },
-            { label: "Req / jogo", value: `${budget.reqPerGame}${isAutoReq ? " (auto)" : " (manual)"}` },
+            { label: "Req / jogo (global)", value: `${budget.reqPerGame}${isAutoReq ? " (auto)" : " (manual)"}` },
             { label: "Intervalo live", value: fmtMs(budget.liveTTL) },
-            { label: "Intervalo stats", value: fmtMs(budget.statsTTL) },
+            { label: "Intervalo stats (global)", value: fmtMs(budget.statsTTL) },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-[10px] p-3" style={{ backgroundColor: "white", border: "1px solid rgba(27,67,50,0.06)" }}>
               <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9a9a9a" }}>{label}</p>
@@ -141,7 +258,7 @@ export default function LiveAdminControls({ initialSettings, initialGameOverride
               Estatísticas do jogo
             </p>
             <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>
-              Busca posse de bola, chutes, etc. — ~35% do orçamento
+              Posse de bola, chutes, etc. — usa ~35% do orçamento
             </p>
           </div>
           <button
@@ -157,15 +274,15 @@ export default function LiveAdminControls({ initialSettings, initialGameOverride
           </button>
         </div>
 
-        {/* Manual req/game override */}
+        {/* Global req/game override */}
         <div className="flex items-center justify-between gap-4 rounded-[14px] border px-4 py-3"
           style={{ borderColor: "rgba(27,67,50,0.08)" }}>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold" style={{ color: "#1b4332" }}>
-              Requisições por jogo
+              Req / jogo (padrão global)
             </p>
             <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>
-              Deixe vazio para usar o cálculo automático ({initialBudget.reqPerGame} req/jogo hoje)
+              Deixe vazio para automático ({initialBudget.reqPerGame} hoje). Jogos com override próprio ignoram este valor.
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -176,19 +293,19 @@ export default function LiveAdminControls({ initialSettings, initialGameOverride
               value={reqInput}
               onChange={(e) => setReqInput(e.target.value)}
               placeholder="auto"
-              className="w-20 rounded-[10px] border px-3 py-1.5 text-sm font-bold text-center tabular-nums outline-none focus:ring-2 focus:ring-offset-1"
+              className="w-20 rounded-[10px] border px-3 py-1.5 text-sm font-bold text-center tabular-nums outline-none"
               style={{
-                borderColor: "rgba(27,67,50,0.15)",
+                borderColor: isAutoReq ? "rgba(27,67,50,0.15)" : "#52b788",
                 color: "#1b4332",
               }}
             />
             <button
-              onClick={handleReqOverride}
+              onClick={handleGlobalReqOverride}
               disabled={isPending}
               className="rounded-[10px] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: "#1b4332" }}
             >
-              Aplicar
+              {isPending ? "…" : "Aplicar"}
             </button>
           </div>
         </div>
@@ -198,45 +315,23 @@ export default function LiveAdminControls({ initialSettings, initialGameOverride
       {todayGames.length > 0 && (
         <div className="space-y-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9a9a9a" }}>
-            Jogos de hoje · placar ao vivo
+            Jogos de hoje · configuração individual
           </p>
           <div className="space-y-2">
-            {todayGames.map((g) => {
-              const enabled = gameOverrides[g.id] ?? true;
-              return (
-                <div key={g.id}
-                  className="flex items-center justify-between rounded-[14px] border px-4 py-3"
-                  style={{ borderColor: "rgba(27,67,50,0.08)" }}>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
-                      {g.teamA} vs {g.teamB}
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>
-                      {g.time}h · ID {g.id}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {!enabled && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: "rgba(220,38,38,0.10)", color: "#dc2626" }}>
-                        desativado
-                      </span>
-                    )}
-                    <button
-                      onClick={() => toggleGameOverride(g.id, !enabled)}
-                      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                      style={{ backgroundColor: enabled ? "#52b788" : "#d1d5db" }}
-                    >
-                      <span
-                        className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-                        style={{ transform: enabled ? "translateX(1.375rem)" : "translateX(0.125rem)" }}
-                      />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {todayGames.map((g) => (
+              <GameRow
+                key={g.id}
+                game={g}
+                entry={gameOverrides[g.id] ?? { liveEnabled: true, reqPerGame: null }}
+                globalReqPerGame={budget.reqPerGame}
+                onToggle={(enabled) => patchGameOverride(g.id, { liveEnabled: enabled })}
+                onReqChange={(req) => patchGameOverride(g.id, { reqPerGame: req })}
+              />
+            ))}
           </div>
+          <p className="text-[10px]" style={{ color: "#9a9a9a" }}>
+            O campo "req / stats" controla quantas vezes as estatísticas do jogo (posse, chutes…) são atualizadas durante a partida. Deixe em branco para usar o valor global.
+          </p>
         </div>
       )}
 

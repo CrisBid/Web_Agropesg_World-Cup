@@ -26,14 +26,20 @@ export async function GET() {
 
   const disabledGameIds = new Set(
     Object.entries(gameOverrides)
-      .filter(([, v]) => !v)
+      .filter(([, v]) => !v.liveEnabled)
       .map(([k]) => Number(k))
   );
+
+  const perGameReqOverrides: Record<number, number> = {};
+  for (const [gameIdStr, entry] of Object.entries(gameOverrides)) {
+    if (entry.reqPerGame != null) perGameReqOverrides[Number(gameIdStr)] = entry.reqPerGame;
+  }
 
   const matches = await getLiveMatchesWithStats({
     reqPerGameOverride: adminSettings.liveMaxReqPerGame,
     statsEnabled: adminSettings.liveStatsEnabled,
     disabledGameIds,
+    perGameReqOverrides,
   });
 
   return Response.json(

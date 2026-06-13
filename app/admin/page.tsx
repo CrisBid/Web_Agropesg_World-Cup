@@ -29,7 +29,6 @@ export default async function AdminPage() {
       teamA: g.teamA,
       teamB: g.teamB,
       time: g.date.slice(11, 16),
-      liveEnabled: gameOverrides[g.id] ?? true,
     }));
 
   const budget = computeBudget(adminSettings.liveMaxReqPerGame);
