@@ -181,6 +181,7 @@ const STATUS_LABELS: Record<string, string> = {
 // ─── In-memory server-side caches ─────────────────────────────────────────
 
 let liveCache: { matches: LiveMatch[]; fetchedAt: number } | null = null;
+let liveFetchInFlight: Promise<void> | null = null;
 const statsCache = new Map<number, { stats: LiveStats; fetchedAt: number }>();
 
 // ─── Schedule check ────────────────────────────────────────────────────────
@@ -275,13 +276,43 @@ function mapFixture(f: any, knockoutTeams?: Record<number, { teamA: string; team
   };
 }
 
+// Resolves to the shared liveCache. Never throws — errors are swallowed and
+// liveCache is left unchanged so callers fall back to the last good value.
+async function doLiveFetch(): Promise<void> {
+  if (!isAnyGameExpectedLive()) return;
+  try {
+    const [data, results] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      apiFetch(`/fixtures?live=all`) as Promise<any>,
+      getResults(),
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const apiData = data as any;
+    if (apiData.errors && Object.keys(apiData.errors).length > 0) {
+      console.error("[live] API error:", apiData.errors);
+      return;
+    }
+    const knockoutTeams = results.knockoutTeams;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matches: LiveMatch[] = (apiData.response ?? [])
+      .filter((f: any) => f.league?.id === LEAGUE_ID)
+      .map((f: any) => mapFixture(f, knockoutTeams));
+    liveCache = { matches, fetchedAt: Date.now() };
+  } catch (err) {
+    console.error("[live] fetch error:", err);
+  } finally {
+    liveFetchInFlight = null;
+  }
+}
+
 export async function getLiveMatches(opts?: {
   reqPerGameOverride?: number | null;
   disabledGameIds?: Set<number>;
 }): Promise<LiveMatch[]> {
   const now = Date.now();
-
   const { liveTTL } = computeBudget(opts?.reqPerGameOverride);
+
+  // Cache hit — no fetch needed
   if (liveCache && now - liveCache.fetchedAt < liveTTL) {
     const cached = liveCache.matches;
     if (opts?.disabledGameIds?.size) {
@@ -290,40 +321,20 @@ export async function getLiveMatches(opts?: {
     return cached;
   }
 
-  // Don't burn a request if no game should be live right now
-  if (!isAnyGameExpectedLive()) {
-    return liveCache?.matches ?? [];
+  // Deduplicate concurrent calls: if a fetch is already in-flight, await it
+  // instead of issuing a second request to the external API.
+  if (liveFetchInFlight) {
+    await liveFetchInFlight;
+  } else {
+    liveFetchInFlight = doLiveFetch();
+    await liveFetchInFlight;
   }
 
-  try {
-    const [data, results] = await Promise.all([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiFetch(`/fixtures?live=all`) as Promise<any>,
-      getResults(),
-    ]);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apiData = data as any;
-    if (apiData.errors && Object.keys(apiData.errors).length > 0) {
-      console.error("[live] API error:", apiData.errors);
-      return liveCache?.matches ?? [];
-    }
-
-    const knockoutTeams = results.knockoutTeams;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const matches: LiveMatch[] = (apiData.response ?? [])
-      .filter((f: any) => f.league?.id === LEAGUE_ID)
-      .map((f: any) => mapFixture(f, knockoutTeams));
-
-    liveCache = { matches, fetchedAt: now };
-    if (opts?.disabledGameIds?.size) {
-      return matches.filter((m) => m.gameId == null || !opts.disabledGameIds!.has(m.gameId));
-    }
-    return matches;
-  } catch (err) {
-    console.error("[live] fetch error:", err);
-    return liveCache?.matches ?? [];
+  const matches = liveCache?.matches ?? [];
+  if (opts?.disabledGameIds?.size) {
+    return matches.filter((m) => m.gameId == null || !opts.disabledGameIds!.has(m.gameId));
   }
+  return matches;
 }
 
 // ─── Match statistics ──────────────────────────────────────────────────────
@@ -370,8 +381,20 @@ export async function getLiveMatchesWithStats(opts?: {
   disabledGameIds?: Set<number>;
   perGameReqOverrides?: Record<number, number>; // gameId → reqPerGame override
 }): Promise<LiveMatch[]> {
+  // Compute the effective live TTL: use the most restrictive (largest) per-game
+  // TTL among games that have a per-game override, falling back to the global setting.
+  // This way a per-game limit of e.g. 5 slows down the shared live endpoint too.
+  let effectiveReqPerGame = opts?.reqPerGameOverride ?? null;
+  const perGame = opts?.perGameReqOverrides;
+  if (perGame && Object.keys(perGame).length > 0) {
+    const minReq = Math.min(...Object.values(perGame));
+    if (effectiveReqPerGame == null || minReq < effectiveReqPerGame) {
+      effectiveReqPerGame = minReq;
+    }
+  }
+
   const matches = await getLiveMatches({
-    reqPerGameOverride: opts?.reqPerGameOverride,
+    reqPerGameOverride: effectiveReqPerGame,
     disabledGameIds: opts?.disabledGameIds,
   });
   if (matches.length === 0) return [];

@@ -16,25 +16,51 @@ export interface PendingGame {
   time: string;
 }
 
-interface Props {
-  pendingGames?: PendingGame[];
+// Extended game info used for client-side window detection
+export interface WatchGame {
+  id: number;
+  teamA: string;
+  teamB: string;
+  time: string;
+  kickoffMs: number;
+  hasResult: boolean; // true at server render time; page reloads after sync
 }
 
-const RETRY_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes between retries
-const MAX_RETRY_MS      = 30 * 60 * 1000; // give up after 30 minutes
+interface Props {
+  pendingGames?: PendingGame[];  // pre-computed by server at page load
+  watchGames?: WatchGame[];      // all today's games — used for client-side detection
+}
 
-export default function SyncButton({ pendingGames = [] }: Props) {
+const RETRY_INTERVAL_MS = 2 * 60 * 1000;  // 2 min between attempts
+const MAX_RETRY_MS      = 30 * 60 * 1000; // give up after 30 min
+const GAME_END_BUFFER_MS = 115 * 60 * 1000; // kickoff + 115 min = expected end
+
+function pendingNow(watchGames: WatchGame[]): WatchGame[] {
+  const now = Date.now();
+  return watchGames.filter((g) => {
+    const expectedEnd = g.kickoffMs + GAME_END_BUFFER_MS;
+    return !g.hasResult && now >= expectedEnd && now < expectedEnd + MAX_RETRY_MS;
+  });
+}
+
+export default function SyncButton({ pendingGames = [], watchGames = [] }: Props) {
   const [loading, setLoading]     = useState(false);
   const [result, setResult]       = useState<SyncResult | null>(null);
   const [error, setError]         = useState<string | null>(null);
 
-  // Auto-sync state
-  const [autoActive, setAutoActive]   = useState(false);
+  const [autoActive, setAutoActive]     = useState(false);
   const [autoAttempts, setAutoAttempts] = useState(0);
-  const [autoCountdown, setAutoCountdown] = useState(0); // seconds until next attempt
-  const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startedAtRef = useRef<number>(0);
+  const [autoCountdown, setAutoCountdown] = useState(0);
+  // The games currently being watched by the running auto-sync
+  const [activePending, setActivePending] = useState<PendingGame[]>([]);
+
+  const timerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const detectorRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedAtRef  = useRef<number>(0);
+  const autoActiveRef = useRef(false); // mirror of autoActive usable inside callbacks
+
+  // ─── Sync call ───────────────────────────────────────────────────────────
 
   async function doSync(isAuto = false): Promise<boolean> {
     setLoading(true);
@@ -57,7 +83,9 @@ export default function SyncButton({ pendingGames = [] }: Props) {
     }
   }
 
-  function clearTimers() {
+  // ─── Timer helpers ────────────────────────────────────────────────────────
+
+  function clearSyncTimers() {
     if (timerRef.current)     clearTimeout(timerRef.current);
     if (countdownRef.current) clearInterval(countdownRef.current);
     timerRef.current = null;
@@ -65,7 +93,7 @@ export default function SyncButton({ pendingGames = [] }: Props) {
   }
 
   function startCountdown(durationMs: number) {
-    clearTimers();
+    clearSyncTimers();
     let remaining = Math.round(durationMs / 1000);
     setAutoCountdown(remaining);
     countdownRef.current = setInterval(() => {
@@ -78,11 +106,15 @@ export default function SyncButton({ pendingGames = [] }: Props) {
     }, 1000);
   }
 
+  // ─── Auto-sync loop ───────────────────────────────────────────────────────
+
   async function autoSync() {
     if (Date.now() - startedAtRef.current > MAX_RETRY_MS) {
       setAutoActive(false);
+      autoActiveRef.current = false;
       setAutoAttempts(0);
       setAutoCountdown(0);
+      setActivePending([]);
       return;
     }
 
@@ -90,33 +122,72 @@ export default function SyncButton({ pendingGames = [] }: Props) {
     const gotResult = await doSync(true);
 
     if (gotResult) {
-      // Result arrived — reload page so server re-renders with updated data
       window.location.reload();
       return;
     }
 
-    // Not yet — schedule next attempt
     startCountdown(RETRY_INTERVAL_MS);
     timerRef.current = setTimeout(autoSync, RETRY_INTERVAL_MS);
   }
 
-  // Start auto-sync when component mounts with pending games
-  useEffect(() => {
-    if (pendingGames.length === 0) return;
+  function startAutoSync(games: PendingGame[]) {
+    clearSyncTimers();
     setAutoActive(true);
+    autoActiveRef.current = true;
     setAutoAttempts(0);
+    setActivePending(games);
     startedAtRef.current = Date.now();
     autoSync();
-    return clearTimers;
+  }
+
+  // ─── Boot: server-detected pending games (page loaded after game ended) ──
+
+  useEffect(() => {
+    if (pendingGames.length > 0) {
+      startAutoSync(pendingGames);
+    }
+    return () => {
+      clearSyncTimers();
+      if (detectorRef.current) clearInterval(detectorRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── Client-side detector: fires every 60 s to catch games that end while
+  //     the page is already open (pendingGames was empty at server render) ───
+
+  useEffect(() => {
+    if (watchGames.length === 0) return;
+
+    function check() {
+      if (autoActiveRef.current) return; // already running
+      const now = pendingNow(watchGames);
+      if (now.length > 0) {
+        startAutoSync(now.map((g) => ({ id: g.id, teamA: g.teamA, teamB: g.teamB, time: g.time })));
+      }
+    }
+
+    // Check immediately (catches page loads right at the boundary)
+    check();
+    detectorRef.current = setInterval(check, 60_000);
+    return () => {
+      if (detectorRef.current) clearInterval(detectorRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Manual sync ─────────────────────────────────────────────────────────
+
   async function handleManualSync() {
-    clearTimers();
+    clearSyncTimers();
     setAutoActive(false);
+    autoActiveRef.current = false;
     setAutoCountdown(0);
+    setActivePending([]);
     await doSync(false);
   }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="rounded-[20px] border p-6 space-y-4"
@@ -148,7 +219,7 @@ export default function SyncButton({ pendingGames = [] }: Props) {
       </div>
 
       {/* Auto-sync status banner */}
-      {autoActive && pendingGames.length > 0 && (
+      {autoActive && activePending.length > 0 && (
         <div className="rounded-[14px] px-4 py-3 space-y-2"
           style={{ backgroundColor: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.25)" }}>
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -167,7 +238,7 @@ export default function SyncButton({ pendingGames = [] }: Props) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {pendingGames.map((g) => (
+            {activePending.map((g) => (
               <span key={g.id}
                 className="text-xs px-2.5 py-1 rounded-full font-medium"
                 style={{ backgroundColor: "rgba(201,168,76,0.12)", color: "#8b7028" }}>

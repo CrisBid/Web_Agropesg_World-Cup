@@ -3,7 +3,7 @@ import { getParticipants, getResults, getLiveScoreEnabled, getLiveAdminSettings,
 import { GAMES } from "@/lib/games-data";
 import { computeBudget } from "@/lib/api-football";
 import SyncButton from "./SyncButton";
-import type { PendingGame } from "./SyncButton";
+import type { PendingGame, WatchGame } from "./SyncButton";
 import LiveToggle from "./LiveToggle";
 import LiveAdminControls from "./LiveAdminControls";
 import LiveBannerTest from "./LiveBannerTest";
@@ -46,14 +46,25 @@ export default async function AdminPage() {
     })
     .map((g) => ({ id: g.id, teamA: g.teamA, teamB: g.teamB, time: g.date.slice(11, 16) }));
 
-  const todayGames = GAMES
+  // All today's games with kickoff timestamps — used by SyncButton's client-side
+  // detector to start auto-sync even if the page was loaded before the game ended.
+  const watchGames: WatchGame[] = GAMES
     .filter((g) => g.date.slice(0, 10) === today)
-    .map((g) => ({
-      id: g.id,
-      teamA: g.teamA,
-      teamB: g.teamB,
-      time: g.date.slice(11, 16),
-    }));
+    .map((g) => {
+      const hasResult = g.phase === "grupos"
+        ? results.groups[g.id] !== undefined
+        : results.knockout[g.id] !== undefined;
+      return {
+        id: g.id,
+        teamA: g.teamA,
+        teamB: g.teamB,
+        time: g.date.slice(11, 16),
+        kickoffMs: new Date(g.date + ":00-03:00").getTime(),
+        hasResult,
+      };
+    });
+
+  const todayGames = watchGames.map(({ id, teamA, teamB, time }) => ({ id, teamA, teamB, time }));
 
   const budget = computeBudget(adminSettings.liveMaxReqPerGame);
 
@@ -127,7 +138,7 @@ export default async function AdminPage() {
       />
 
       {/* Sync */}
-      <SyncButton pendingGames={pendingGames} />
+      <SyncButton pendingGames={pendingGames} watchGames={watchGames} />
 
       {/* Quick links */}
       {participants.length > 0 && (
