@@ -278,9 +278,17 @@ function mapFixture(f: any, knockoutTeams?: Record<number, { teamA: string; team
 
 // Resolves to the shared liveCache. Never throws — errors are swallowed and
 // liveCache is left unchanged so callers fall back to the last good value.
+// IMPORTANT: liveFetchInFlight = null is always set in the finally block,
+// even on the early-return path, so subsequent callers always start a fresh fetch.
 async function doLiveFetch(): Promise<void> {
-  if (!isAnyGameExpectedLive()) return;
   try {
+    if (!isAnyGameExpectedLive()) {
+      // No game expected — update the cache with empty matches so stale data
+      // from a previous game is not served to clients between matches.
+      liveCache = { matches: [], fetchedAt: Date.now() };
+      return;
+    }
+
     const [data, results] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiFetch(`/fixtures?live=all`) as Promise<any>,
@@ -301,6 +309,7 @@ async function doLiveFetch(): Promise<void> {
   } catch (err) {
     console.error("[live] fetch error:", err);
   } finally {
+    // Always clear the inflight flag so the next cache-miss starts a new fetch.
     liveFetchInFlight = null;
   }
 }
@@ -379,22 +388,12 @@ export async function getLiveMatchesWithStats(opts?: {
   reqPerGameOverride?: number | null;
   statsEnabled?: boolean;
   disabledGameIds?: Set<number>;
-  perGameReqOverrides?: Record<number, number>; // gameId → reqPerGame override
+  perGameReqOverrides?: Record<number, number>; // gameId → reqPerGame override (stats only)
 }): Promise<LiveMatch[]> {
-  // Compute the effective live TTL: use the most restrictive (largest) per-game
-  // TTL among games that have a per-game override, falling back to the global setting.
-  // This way a per-game limit of e.g. 5 slows down the shared live endpoint too.
-  let effectiveReqPerGame = opts?.reqPerGameOverride ?? null;
-  const perGame = opts?.perGameReqOverrides;
-  if (perGame && Object.keys(perGame).length > 0) {
-    const minReq = Math.min(...Object.values(perGame));
-    if (effectiveReqPerGame == null || minReq < effectiveReqPerGame) {
-      effectiveReqPerGame = minReq;
-    }
-  }
-
+  // The shared live endpoint (/fixtures?live=all) uses the global reqPerGame for TTL.
+  // Per-game overrides only affect stats TTL (each fixture has its own stats endpoint).
   const matches = await getLiveMatches({
-    reqPerGameOverride: effectiveReqPerGame,
+    reqPerGameOverride: opts?.reqPerGameOverride,
     disabledGameIds: opts?.disabledGameIds,
   });
   if (matches.length === 0) return [];
