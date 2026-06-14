@@ -308,6 +308,12 @@ async function doLiveFetch(): Promise<void> {
     liveCache = { matches, fetchedAt: Date.now() };
   } catch (err) {
     console.error("[live] fetch error:", err);
+    // If the API is unreachable and the cache is very stale (older than GAME_DURATION),
+    // clear it so clients don't see a frozen in-progress score indefinitely.
+    // The next successful fetch — or the !isAnyGameExpectedLive() path — will repopulate.
+    if (liveCache && Date.now() - liveCache.fetchedAt > GAME_DURATION) {
+      liveCache = { matches: [], fetchedAt: Date.now() };
+    }
   } finally {
     // Always clear the inflight flag so the next cache-miss starts a new fetch.
     liveFetchInFlight = null;
