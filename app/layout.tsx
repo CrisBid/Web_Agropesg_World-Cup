@@ -54,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
 
-        <LiveScoreBanner />
+        <LiveScoreBanner participantId={session?.id ?? null} />
         <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-10">{children}</main>
 
         <footer className="border-t py-6 text-center text-sm" style={{ borderColor: "rgba(27,67,50,0.12)", color: "#5a5a5a" }}>

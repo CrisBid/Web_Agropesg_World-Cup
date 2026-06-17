@@ -1,5 +1,5 @@
 import { getLiveMatchesWithStats, isAnyGameExpectedLive, computeBudget } from "@/lib/api-football";
-import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getGroupGameStats } from "@/lib/data";
+import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getGroupGameStats, getPredictions } from "@/lib/data";
 import { GAMES } from "@/lib/games-data";
 import type { GamePredictionStats } from "@/lib/data";
 
@@ -79,7 +79,26 @@ function fakeLiveMatch(status: "2H" | "FT") {
 
 // ─── Route ────────────────────────────────────────────────────────────────
 
-export async function GET() {
+async function buildUserPredictions(uid: string): Promise<Record<number, string>> {
+  try {
+    const preds = await getPredictions(uid);
+    const map: Record<number, string> = {};
+    for (const [gameIdStr, p] of Object.entries(preds.groups)) {
+      if (p.scoreA !== null && p.scoreB !== null)
+        map[Number(gameIdStr)] = `${p.scoreA}–${p.scoreB}`;
+    }
+    for (const [gameIdStr, p] of Object.entries(preds.knockout)) {
+      if (p.winner) map[Number(gameIdStr)] = p.winner;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export async function GET(req: Request) {
+  const uid = new URL(req.url).searchParams.get("uid") ?? null;
+
   const [enabled, adminSettings, gameOverrides] = await Promise.all([
     getLiveScoreEnabled(),
     getLiveAdminSettings(),
@@ -89,12 +108,15 @@ export async function GET() {
   const budget = computeBudget(adminSettings.liveMaxReqPerGame);
   const testMode = adminSettings.liveBannerTestMode;
 
+  const userPredictions = uid ? await buildUserPredictions(uid) : {};
+
   // ── Test mode ──
   if (testMode === "pre") {
     return Response.json({
       matches: [],
       upcoming: [fakePreData()],
       predStats: {},
+      userPredictions,
       expected: false,
       budget,
       testMode: "pre",
@@ -105,6 +127,7 @@ export async function GET() {
       matches: [fakeLiveMatch("2H")],
       upcoming: [],
       predStats: { 99999: FAKE_PRED_STATS },
+      userPredictions,
       expected: true,
       fetchedAt: new Date().toISOString(),
       budget,
@@ -116,6 +139,7 @@ export async function GET() {
       matches: [fakeLiveMatch("FT")],
       upcoming: [],
       predStats: { 99999: FAKE_PRED_STATS },
+      userPredictions,
       expected: false,
       fetchedAt: new Date().toISOString(),
       budget,
@@ -128,14 +152,14 @@ export async function GET() {
 
   if (!enabled) {
     return Response.json(
-      { matches: [], upcoming: [], predStats: {}, expected: false, disabled: true, budget },
+      { matches: [], upcoming: [], predStats: {}, userPredictions, expected: false, disabled: true, budget },
       { headers: { "Cache-Control": "public, max-age=30" } }
     );
   }
 
   if (!isAnyGameExpectedLive() && upcoming.length === 0) {
     return Response.json(
-      { matches: [], upcoming, predStats: {}, expected: false, budget },
+      { matches: [], upcoming, predStats: {}, userPredictions, expected: false, budget },
       { headers: { "Cache-Control": "public, max-age=60" } }
     );
   }
@@ -178,6 +202,7 @@ export async function GET() {
       matches,
       upcoming: upcoming.filter((u) => !disabledGameIds.has(u.gameId)),
       predStats,
+      userPredictions,
       expected: true,
       fetchedAt: new Date().toISOString(),
       budget,

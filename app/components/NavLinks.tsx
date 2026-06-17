@@ -44,8 +44,8 @@ export default function NavLinks({ session }: Props) {
       <Link href="/ranking" className={linkClass("/ranking")} style={linkStyle("/ranking")}>
         Ranking
       </Link>
-      <Link href="/calendario" className={linkClass("/calendario")} style={linkStyle("/calendario")}>
-        Calendário
+      <Link href="/jogos" className={linkClass("/jogos")} style={linkStyle("/jogos")}>
+        Jogos
       </Link>
 
       {session ? (

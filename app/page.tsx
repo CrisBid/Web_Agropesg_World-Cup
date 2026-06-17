@@ -32,6 +32,16 @@ async function getRanking() {
   return entries.sort((a, b) => b.total - a.total);
 }
 
+const PHASE_CONFIG: { phase: Phase; label: string; color: string }[] = [
+  { phase: "grupos",   label: "Grupos",     color: "#52b788" },
+  { phase: "fase32",   label: "Fase de 32", color: "#2d6a4f" },
+  { phase: "oitavas",  label: "Oitavas",    color: "#1b4332" },
+  { phase: "quartas",  label: "Quartas",    color: "#40916c" },
+  { phase: "semis",    label: "Semifinais", color: "#b68e1e" },
+  { phase: "terceiro", label: "3º Lugar",   color: "#c9a84c" },
+  { phase: "final",    label: "Final",      color: "#e5b030" },
+];
+
 const SCORING_GROUPS = [
   { label: "Resultado correto (V/E/D)", pts: 3 },
   { label: "Gols do time A correto", pts: 1 },
@@ -95,6 +105,17 @@ export default async function Home() {
     return { date, isToday, label, games };
   });
 
+  const phaseStats = PHASE_CONFIG.map((cfg) => {
+    const total = GAMES.filter((g) => g.phase === cfg.phase).length;
+    const played = GAMES.filter((g) => g.phase === cfg.phase && playedIds.has(g.id)).length;
+    return { ...cfg, total, played };
+  });
+  const totalGames  = phaseStats.reduce((s, p) => s + p.total, 0);
+  const totalPlayed = phaseStats.reduce((s, p) => s + p.played, 0);
+  const overallPct  = totalGames > 0 ? Math.round((totalPlayed / totalGames) * 100) : 0;
+  const _activePrimary = phaseStats.findIndex((p) => p.played > 0 && p.played < p.total);
+  const activePhaseIdx = _activePrimary >= 0 ? _activePrimary : phaseStats.findIndex((p) => p.played < p.total);
+
   return (
     <div className="space-y-12">
 
@@ -125,6 +146,55 @@ export default async function Home() {
             <Stat value={gamesPlayed} label="Jogos disputados" suffix={`/104`} />
             <div style={{ width: 1, height: 32, backgroundColor: "rgba(255,255,255,0.15)" }} />
             <Stat value={104} label="Jogos no total" />
+          </div>
+
+          {/* ── Barra de progresso ── */}
+          <div className="pt-3 space-y-2.5 w-full">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium tracking-wide uppercase"
+                style={{ color: "rgba(255,255,255,0.4)" }}>Progresso da Copa</span>
+              <span className="text-[11px] font-semibold tabular-nums"
+                style={{ color: "rgba(255,255,255,0.55)" }}>
+                {totalPlayed} / {totalGames} jogos · {overallPct}%
+              </span>
+            </div>
+
+            {/* bar */}
+            <div className="flex w-full h-1.5 rounded-full overflow-hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.10)" }}>
+              {phaseStats.map((p) => {
+                const segW   = (p.total / totalGames) * 100;
+                const fillW  = p.total > 0 ? (p.played / p.total) * 100 : 0;
+                const done   = p.played === p.total && p.total > 0;
+                return (
+                  <div key={p.phase} className="relative h-full" style={{ width: `${segW}%` }}>
+                    <div className="absolute inset-y-0 left-0"
+                      style={{ width: `${fillW}%`, backgroundColor: done ? "rgba(255,255,255,0.80)" : "#52b788" }} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* phase labels */}
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+              {phaseStats.map((p, i) => {
+                const phasePct = Math.round((p.total / totalGames) * 100);
+                const done   = p.played === p.total && p.total > 0;
+                const active = i === activePhaseIdx;
+                return (
+                  <span key={p.phase} className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+                      backgroundColor: done ? "rgba(255,255,255,0.7)" : active ? "#52b788" : "rgba(255,255,255,0.18)",
+                    }} />
+                    <span className="text-[10px] font-medium" style={{
+                      color: done ? "rgba(255,255,255,0.65)" : active ? "#74c69d" : "rgba(255,255,255,0.28)",
+                    }}>
+                      {p.label} · {phasePct}%
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
           </div>
 
           {!participants.length && (
@@ -271,3 +341,4 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     </h2>
   );
 }
+

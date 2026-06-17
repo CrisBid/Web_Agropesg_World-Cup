@@ -3,9 +3,10 @@
 import { useEffect, useState, useRef } from "react";
 import type { LiveMatch, LiveStats } from "@/lib/api-football";
 import type { GamePredictionStats } from "@/lib/data";
+import type { PostGameStatsData } from "@/app/api/post-game-stats/route";
 import { GAMES, PHASE_LABELS } from "@/lib/games-data";
 
-const POST_GAME_FREEZE_MS = 30 * 60_000; // show frozen result for 30 min
+const POST_GAME_FREEZE_MS = 20 * 60_000; // show frozen result for 20 min
 
 interface UpcomingGame {
   gameId: number;
@@ -24,6 +25,7 @@ interface LiveResponse {
   matches: LiveMatch[];
   upcoming: UpcomingGame[];
   predStats: Record<number, GamePredictionStats>;
+  userPredictions?: Record<number, string>;
   expected: boolean;
   fetchedAt?: string;
   budget: BudgetInfo;
@@ -99,9 +101,106 @@ function PredictionBar({ homeTeam, awayTeam, stats }: {
   );
 }
 
-function MatchCard({ match, expanded, onToggle, frozen, predStats }: {
+function PostGamePanel({ stats }: { stats: PostGameStatsData }) {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [showPreds, setShowPreds]     = useState(false);
+  const n = stats.totalWithPrediction;
+
+  return (
+    <div className="border-t space-y-3 px-4 py-3"
+      style={{ borderColor: "rgba(27,67,50,0.07)", backgroundColor: "#f8faf8" }}>
+
+      {/* ── Criteria ── */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "#9a9a9a" }}>
+          Apostas · {n} de {stats.totalParticipants} participante{stats.totalParticipants !== 1 ? "s" : ""}
+        </p>
+        <div className="space-y-2">
+          {stats.criteria.map((c, i) => {
+            const pct  = n > 0 ? Math.round((c.count / n) * 100) : 0;
+            const open = expandedIdx === i;
+            const barColor = pct >= 50 ? "#52b788" : pct >= 25 ? "#95d5b2" : "#c9a84c";
+            return (
+              <div key={i}>
+                <button
+                  className="w-full text-left"
+                  onClick={() => setExpandedIdx(open ? null : i)}
+                  disabled={c.count === 0}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs flex-1 truncate" style={{ color: "#3a3a3a" }}>{c.label}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                      style={{ backgroundColor: "rgba(82,183,136,0.12)", color: "#2d6a4f" }}>
+                      +{c.pts}pt{c.pts > 1 ? "s" : ""}
+                    </span>
+                    <span className="text-xs font-bold tabular-nums shrink-0" style={{ color: "#1b4332" }}>
+                      {c.count}/{n}
+                    </span>
+                    <span className="text-[10px] w-7 text-right shrink-0" style={{ color: "#9a9a9a" }}>{pct}%</span>
+                    {c.count > 0 && (
+                      <span className="text-[10px] shrink-0 transition-transform duration-150" style={{
+                        color: "#b0b0b0",
+                        display: "inline-block",
+                        transform: open ? "rotate(180deg)" : "rotate(0deg)",
+                      }}>▾</span>
+                    )}
+                  </div>
+                  <div className="mt-1 h-1 rounded-full overflow-hidden"
+                    style={{ backgroundColor: "rgba(27,67,50,0.08)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                  </div>
+                </button>
+                {open && c.count > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {c.names.map((name) => (
+                      <span key={name} className="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                        style={{ backgroundColor: "rgba(82,183,136,0.13)", color: "#1b4332" }}>
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Prediction groups ── */}
+      {stats.predGroups.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowPreds((v) => !v)}
+            className="flex items-center gap-1.5 text-[11px] font-semibold"
+            style={{ color: "#52b788" }}>
+            <span style={{ display: "inline-block", transform: showPreds ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>▸</span>
+            Palpites ({stats.predGroups.length} placar{stats.predGroups.length !== 1 ? "es" : ""} diferentes)
+          </button>
+          {showPreds && (
+            <div className="mt-2 space-y-1">
+              {stats.predGroups.map((pg) => (
+                <div key={pg.prediction} className="flex items-baseline gap-2.5">
+                  <span className="text-xs font-black shrink-0 tabular-nums w-14"
+                    style={{ color: pg.correct ? "#52b788" : "#5a5a5a" }}>
+                    {pg.prediction}{pg.correct ? " ✓" : ""}
+                  </span>
+                  <span className="text-[11px] leading-snug" style={{ color: "#6a6a6a" }}>
+                    {pg.names.join(", ")}
+                    <span className="ml-1 text-[10px]" style={{ color: "#b0b0b0" }}>({pg.names.length}×)</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MatchCard({ match, expanded, onToggle, frozen, predStats, userPrediction, postGameStats }: {
   match: LiveMatch; expanded: boolean; onToggle: () => void; frozen?: boolean;
-  predStats?: GamePredictionStats;
+  predStats?: GamePredictionStats; userPrediction?: string; postGameStats?: PostGameStatsData;
 }) {
   const isHt   = match.status === "HT";
   const isFt   = match.status === "FT";
@@ -151,6 +250,15 @@ function MatchCard({ match, expanded, onToggle, frozen, predStats }: {
             </span>
             <span className="font-bold text-sm truncate text-right" style={{ color: "#1b4332" }}>{match.awayTeam}</span>
           </div>
+          {userPrediction && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="flex-1 text-xs font-medium" style={{ color: "#b0b0b0" }}>Seu palpite</span>
+              <span className="shrink-0 text-base font-black tabular-nums" style={{ color: "#c9a84c" }}>
+                {userPrediction}
+              </span>
+              <span className="flex-1" />
+            </div>
+          )}
         </div>
 
         {stats && (
@@ -186,7 +294,7 @@ function MatchCard({ match, expanded, onToggle, frozen, predStats }: {
         />
       )}
 
-      {/* Stats panel */}
+      {/* Stats panel (live, expanded) */}
       {expanded && stats && (
         <div className="px-4 pt-2 pb-3 space-y-1.5 border-t" style={{ borderColor: "rgba(27,67,50,0.06)", backgroundColor: "#fafcfa" }}>
           <div className="flex justify-between text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#9a9a9a" }}>
@@ -206,6 +314,9 @@ function MatchCard({ match, expanded, onToggle, frozen, predStats }: {
           <StatBar label="Defesas"      home={stats.saves.home}         away={stats.saves.away}         />
         </div>
       )}
+
+      {/* Post-game betting stats */}
+      {frozen && postGameStats && <PostGamePanel stats={postGameStats} />}
     </div>
   );
 }
@@ -231,7 +342,7 @@ function useCountdown(kickoffMs: number): string {
   return label;
 }
 
-function UpcomingCard({ game }: { game: UpcomingGame }) {
+function UpcomingCard({ game, userPrediction }: { game: UpcomingGame; userPrediction?: string }) {
   const countdown = useCountdown(game.kickoffMs);
   const label = game.group ? `Grupo ${game.group}` : PHASE_LABELS[game.phase as keyof typeof PHASE_LABELS] ?? game.phase;
 
@@ -252,6 +363,12 @@ function UpcomingCard({ game }: { game: UpcomingGame }) {
           <span className="text-base font-black shrink-0" style={{ color: "#9a9a9a" }}>vs</span>
           <span className="font-bold text-sm truncate text-right" style={{ color: "#1b4332" }}>{game.teamB}</span>
         </div>
+        {userPrediction && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold mt-1.5 px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: "rgba(201,168,76,0.14)", color: "#8b7028" }}>
+            Seu palpite: {userPrediction}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -259,15 +376,18 @@ function UpcomingCard({ game }: { game: UpcomingGame }) {
 
 // ─── Main Banner ─────────────────────────────────────────────────────────────
 
-export default function LiveScoreBanner() {
+export default function LiveScoreBanner({ participantId }: { participantId?: string | null }) {
   const [data, setData] = useState<LiveResponse | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [frozenPredStats, setFrozenPredStats] = useState<Record<number, GamePredictionStats>>({});
+  const [userPredictions, setUserPredictions] = useState<Record<number, string>>({});
+  const [postGameStats, setPostGameStats]     = useState<Record<number, PostGameStatsData>>({});
 
   // Post-game freeze state
   const [frozenMatches, setFrozenMatches] = useState<LiveMatch[]>([]);
   const [gameEndedAt, setGameEndedAt] = useState<number | null>(null);
-  const hadLiveRef = useRef(false);
+  const hadLiveRef       = useRef(false);
+  const statsFetchedRef  = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,7 +395,8 @@ export default function LiveScoreBanner() {
     async function poll() {
       if (cancelled) return;
       try {
-        const res = await fetch("/api/live", { cache: "no-store" });
+        const url = participantId ? `/api/live?uid=${participantId}` : "/api/live";
+        const res = await fetch(url, { cache: "no-store" });
         if (res.ok && !cancelled) {
           const json: LiveResponse = await res.json();
           setData(json);
@@ -283,6 +404,8 @@ export default function LiveScoreBanner() {
           const isTestPost = json.testMode === "post";
 
           // Track live → ended transition (for real games and test "post" mode)
+          if (json.userPredictions) setUserPredictions(json.userPredictions);
+
           if (json.matches.length > 0 && !isTestPost) {
             hadLiveRef.current = true;
             setFrozenMatches(json.matches);
@@ -314,6 +437,18 @@ export default function LiveScoreBanner() {
     poll();
     return () => { cancelled = true; };
   }, []);
+
+  // Fetch post-game betting stats once when the game ends
+  useEffect(() => {
+    if (!gameEndedAt || frozenMatches.length === 0 || statsFetchedRef.current) return;
+    statsFetchedRef.current = true;
+    const ids = frozenMatches.map((m) => m.gameId).filter((id): id is number => id !== null);
+    if (ids.length === 0) return;
+    fetch(`/api/post-game-stats?gameIds=${ids.join(",")}`)
+      .then((r) => r.json())
+      .then((data: Record<number, PostGameStatsData>) => setPostGameStats(data))
+      .catch(() => {});
+  }, [gameEndedAt, frozenMatches]);
 
   const matches = data?.matches ?? [];
   const upcoming = data?.upcoming ?? [];
@@ -397,6 +532,8 @@ export default function LiveScoreBanner() {
                   match={m}
                   frozen={isPostGame}
                   predStats={ps}
+                  userPrediction={m.gameId != null ? userPredictions[m.gameId] : undefined}
+                  postGameStats={m.gameId != null ? postGameStats[m.gameId] : undefined}
                   expanded={expandedId === m.fixtureId}
                   onToggle={() => setExpandedId(expandedId === m.fixtureId ? null : m.fixtureId)}
                 />
@@ -408,7 +545,9 @@ export default function LiveScoreBanner() {
         {/* Upcoming game cards */}
         {isPre && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {upcoming.map((g) => <UpcomingCard key={g.gameId} game={g} />)}
+            {upcoming.map((g) => (
+            <UpcomingCard key={g.gameId} game={g} userPrediction={userPredictions[g.gameId]} />
+          ))}
           </div>
         )}
       </div>
