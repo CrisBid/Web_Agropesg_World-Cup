@@ -338,3 +338,34 @@ export async function setLiveGameOverride(gameId: number, patch: Partial<GameOve
     },
   });
 }
+
+// ─── Game Schedule Overrides ──────────────────────────────────────────────────
+
+export interface GameScheduleOverride {
+  gameId: number;
+  date: string | null;
+  stadium: string | null;
+  teamA: string | null;
+  teamB: string | null;
+}
+
+export async function getGameScheduleOverrides(): Promise<Record<number, GameScheduleOverride>> {
+  const rows = await prisma.gameScheduleOverride.findMany();
+  const result: Record<number, GameScheduleOverride> = {};
+  for (const r of rows) {
+    result[r.gameId] = { gameId: r.gameId, date: r.date, stadium: r.stadium, teamA: r.teamA, teamB: r.teamB };
+  }
+  return result;
+}
+
+export async function saveGameScheduleOverride(gameId: number, data: Omit<GameScheduleOverride, "gameId">): Promise<void> {
+  await prisma.gameScheduleOverride.upsert({
+    where: { gameId },
+    update: data,
+    create: { gameId, ...data },
+  });
+}
+
+export async function deleteGameScheduleOverride(gameId: number): Promise<void> {
+  await prisma.gameScheduleOverride.deleteMany({ where: { gameId } });
+}

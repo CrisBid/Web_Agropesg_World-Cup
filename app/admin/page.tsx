@@ -85,6 +85,14 @@ export default async function AdminPage() {
       desc: "Inserir placar real dos jogos para calcular a pontuação",
       accent: "#c9a84c",
     },
+    {
+      href: "/admin/partidas",
+      icon: "🗓️",
+      title: "Partidas",
+      value: "Editar horários e estádios",
+      desc: "Corrigir data, horário, estádio ou times de qualquer partida",
+      accent: "#4a90d9",
+    },
   ];
 
   return (

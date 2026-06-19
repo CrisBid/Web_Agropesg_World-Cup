@@ -91,3 +91,13 @@ model LiveGameOverride {
 
   @@map("live_game_overrides")
 }
+
+model GameScheduleOverride {
+  gameId  Int     @id
+  date    String?
+  stadium String?
+  teamA   String?
+  teamB   String?
+
+  @@map("game_schedule_overrides")
+}
