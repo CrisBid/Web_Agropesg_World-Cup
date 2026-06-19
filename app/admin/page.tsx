@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { getParticipants, getResults, getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides } from "@/lib/data";
-import { GAMES } from "@/lib/games-data";
+import { getParticipants, getResults, getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getEffectiveGames } from "@/lib/data";
 import { computeBudget } from "@/lib/api-football";
 import SyncButton from "./SyncButton";
 import type { PendingGame, WatchGame } from "./SyncButton";
@@ -20,19 +19,20 @@ const GAME_END_BUFFER_MS = 115 * 60 * 1000;
 const MAX_WATCH_MS = 30 * 60 * 1000;
 
 export default async function AdminPage() {
-  const [participants, results, liveEnabled, adminSettings, gameOverrides] = await Promise.all([
+  const [participants, results, liveEnabled, adminSettings, gameOverrides, games] = await Promise.all([
     getParticipants(),
     getResults(),
     getLiveScoreEnabled(),
     getLiveAdminSettings(),
     getLiveGameOverrides(),
+    getEffectiveGames(),
   ]);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
 
   const { today, nowMs } = nowBRT();
 
   // Games today that ended but have no result yet
-  const pendingGames: PendingGame[] = GAMES
+  const pendingGames: PendingGame[] = games
     .filter((g) => g.date.slice(0, 10) === today)
     .filter((g) => {
       const kickoffMs = new Date(g.date + ":00-03:00").getTime();
@@ -48,7 +48,7 @@ export default async function AdminPage() {
 
   // All today's games with kickoff timestamps — used by SyncButton's client-side
   // detector to start auto-sync even if the page was loaded before the game ended.
-  const watchGames: WatchGame[] = GAMES
+  const watchGames: WatchGame[] = games
     .filter((g) => g.date.slice(0, 10) === today)
     .map((g) => {
       const hasResult = g.phase === "grupos"

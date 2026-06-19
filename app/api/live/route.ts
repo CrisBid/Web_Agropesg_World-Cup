@@ -1,5 +1,5 @@
 import { getLiveMatchesWithStats, isAnyGameExpectedLive, computeBudget } from "@/lib/api-football";
-import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getGroupGameStats, getPredictions } from "@/lib/data";
+import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getGroupGameStats, getPredictions, getEffectiveGames } from "@/lib/data";
 import { GAMES } from "@/lib/games-data";
 import type { GamePredictionStats } from "@/lib/data";
 
@@ -7,9 +7,10 @@ const PRE_WINDOW_MS = 30 * 60_000;
 
 // ─── Upcoming games ────────────────────────────────────────────────────────
 
-function getUpcomingGames() {
+async function getUpcomingGames() {
+  const games = await getEffectiveGames();
   const now = Date.now();
-  return GAMES
+  return games
     .filter((g) => {
       const kickoff = new Date(g.date + ":00-03:00").getTime();
       return kickoff > now && kickoff - now <= PRE_WINDOW_MS;
@@ -148,7 +149,7 @@ export async function GET(req: Request) {
   }
 
   // ── Normal mode ──
-  const upcoming = getUpcomingGames();
+  const upcoming = await getUpcomingGames();
 
   if (!enabled) {
     return Response.json(

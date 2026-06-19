@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getParticipants, getResults, getPredictions } from "@/lib/data";
+import { getParticipants, getResults, getPredictions, getEffectiveGames } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
@@ -62,10 +62,11 @@ const SCORING_KNOCKOUT = [
 ];
 
 export default async function Home() {
-  const [participants, results, ranking] = await Promise.all([
+  const [participants, results, ranking, effectiveGames] = await Promise.all([
     getParticipants(),
     getResults(),
     getRanking(),
+    getEffectiveGames(),
   ]);
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
 
@@ -84,7 +85,7 @@ export default async function Home() {
   ]);
 
   const distinctDates = [...new Set(
-    GAMES
+    effectiveGames
       .filter((g) => g.date.slice(0, 10) >= today && !playedIds.has(g.id))
       .map((g) => g.date.slice(0, 10))
   )].sort().slice(0, 3); // hoje + próximos 2 dias
@@ -96,7 +97,7 @@ export default async function Home() {
     const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
     const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
     const label = `${days[d.getUTCDay()]}, ${day} de ${months[month - 1]}`;
-    const games = GAMES
+    const games = effectiveGames
       .filter((g) => g.date.slice(0, 10) === date && !playedIds.has(g.id))
       .map((g) => ({
         ...g,

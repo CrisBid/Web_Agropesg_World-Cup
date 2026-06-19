@@ -1,4 +1,6 @@
 import { prisma } from "./prisma";
+import { GAMES } from "./games-data";
+import type { Game } from "./games-data";
 import type { ParticipantPredictions, ActualResults } from "./scoring";
 
 // ─── Participants ───────────────────────────────────────────────────────────
@@ -368,4 +370,19 @@ export async function saveGameScheduleOverride(gameId: number, data: Omit<GameSc
 
 export async function deleteGameScheduleOverride(gameId: number): Promise<void> {
   await prisma.gameScheduleOverride.deleteMany({ where: { gameId } });
+}
+
+export async function getEffectiveGames(): Promise<Game[]> {
+  const overrides = await getGameScheduleOverrides();
+  return GAMES.map((game) => {
+    const ov = overrides[game.id];
+    if (!ov) return game;
+    return {
+      ...game,
+      date: ov.date ?? game.date,
+      stadium: ov.stadium ?? game.stadium,
+      teamA: ov.teamA ?? game.teamA,
+      teamB: ov.teamB ?? game.teamB,
+    };
+  });
 }

@@ -1,6 +1,6 @@
-import { getParticipants, getResults, getPredictions } from "@/lib/data";
-import { GAMES, PHASE_LABELS, PHASE_POINTS } from "@/lib/games-data";
-import type { Phase } from "@/lib/games-data";
+import { getParticipants, getResults, getPredictions, getEffectiveGames } from "@/lib/data";
+import { PHASE_LABELS, PHASE_POINTS } from "@/lib/games-data";
+import type { Phase, Game } from "@/lib/games-data";
 import GameAccordion from "./GameAccordion";
 import type { GameAccordionData, StatRow, PredGroup } from "./GameAccordion";
 
@@ -19,14 +19,14 @@ function formatDateBR(dateStr: string): string {
   return `${days[d.getUTCDay()]}, ${day} de ${months[month - 1]}`;
 }
 
-function groupByPhaseAndDate(games: typeof GAMES) {
+function groupByPhaseAndDate(games: Game[]) {
   const phases: Phase[] = ["grupos", "fase32", "oitavas", "quartas", "semis", "terceiro", "final"];
-  const result: { phase: Phase; dates: { date: string; games: typeof GAMES }[] }[] = [];
+  const result: { phase: Phase; dates: { date: string; games: Game[] }[] }[] = [];
 
   for (const phase of phases) {
     const phaseGames = games.filter((g) => g.phase === phase);
     if (phaseGames.length === 0) continue;
-    const dateMap = new Map<string, typeof GAMES>();
+    const dateMap = new Map<string, Game[]>();
     for (const g of phaseGames) {
       const d = g.date.slice(0, 10);
       if (!dateMap.has(d)) dateMap.set(d, []);
@@ -42,9 +42,10 @@ function groupByPhaseAndDate(games: typeof GAMES) {
 }
 
 export default async function JogosPage() {
-  const [participants, results] = await Promise.all([
+  const [participants, results, games] = await Promise.all([
     getParticipants(),
     getResults(),
+    getEffectiveGames(),
   ]);
 
   // Fetch all predictions in parallel
@@ -57,12 +58,12 @@ export default async function JogosPage() {
 
   const today = todayBRT();
   const totalPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
-  const grouped = groupByPhaseAndDate(GAMES);
+  const grouped = groupByPhaseAndDate(games);
 
   // Build accordion data for each game
   const accordionData: Record<number, GameAccordionData> = {};
 
-  for (const game of GAMES) {
+  for (const game of games) {
     const groupResult = game.phase === "grupos" ? results.groups[game.id] : undefined;
     const knockoutResult = game.phase !== "grupos" ? results.knockout[game.id] : undefined;
     const hasResult = groupResult != null || knockoutResult != null;
