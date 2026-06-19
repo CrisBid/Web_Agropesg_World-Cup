@@ -3,6 +3,7 @@ import { getParticipants, getResults, getLiveScoreEnabled, getLiveAdminSettings,
 import { computeBudget } from "@/lib/api-football";
 import SyncButton from "./SyncButton";
 import type { PendingGame, WatchGame } from "./SyncButton";
+import RestartButton from "./RestartButton";
 import LiveToggle from "./LiveToggle";
 import LiveAdminControls from "./LiveAdminControls";
 import LiveBannerTest from "./LiveBannerTest";
@@ -147,6 +148,9 @@ export default async function AdminPage() {
 
       {/* Sync */}
       <SyncButton pendingGames={pendingGames} watchGames={watchGames} />
+
+      {/* Restart */}
+      <RestartButton />
 
       {/* Quick links */}
       {participants.length > 0 && (
