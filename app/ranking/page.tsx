@@ -1,4 +1,4 @@
-import { getParticipants, getResults, getPredictions, getGroupGameStats } from "@/lib/data";
+import { getParticipants, getResults, getPredictions, getGroupGameStats, getEffectiveGames } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
@@ -21,7 +21,7 @@ function densePosition(ranking: { total: number }[], i: number): number {
 }
 
 export default async function RankingPage() {
-  const [participants, results] = await Promise.all([getParticipants(), getResults()]);
+  const [participants, results, effectiveGames] = await Promise.all([getParticipants(), getResults(), getEffectiveGames()]);
 
   const gamesPhaseMap: Record<number, Phase> = {};
   for (const g of GAMES) gamesPhaseMap[g.id] = g.phase;
@@ -50,7 +50,7 @@ export default async function RankingPage() {
 
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
   const today = todayBRT();
-  const todaysGames = GAMES.filter((g) => g.date.slice(0, 10) === today);
+  const todaysGames = effectiveGames.filter((g) => g.date.slice(0, 10) === today);
 
   const todayItems: TodayGameItem[] = await Promise.all(
     todaysGames.map(async (g) => {
