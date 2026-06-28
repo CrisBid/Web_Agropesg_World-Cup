@@ -218,6 +218,20 @@ export async function saveResults(results: ActualResults): Promise<void> {
   });
 }
 
+export async function saveKnockoutTeams(
+  teams: Record<number, { teamA: string; teamB: string }>
+): Promise<void> {
+  await Promise.all(
+    Object.entries(teams).map(([gameIdStr, t]) =>
+      prisma.knockoutTeam.upsert({
+        where: { gameId: Number(gameIdStr) },
+        update: { teamA: t.teamA, teamB: t.teamB },
+        create: { gameId: Number(gameIdStr), teamA: t.teamA, teamB: t.teamB },
+      })
+    )
+  );
+}
+
 // ─── Game Prediction Stats ───────────────────────────────────────────────────
 
 export interface GamePredictionStats {

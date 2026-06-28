@@ -31,6 +31,8 @@ export default function ResultadosPage() {
   const [activeTab, setActiveTab] = useState<"grupos" | Phase>("grupos");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [populatingFase32, setPopulatingFase32] = useState(false);
+  const [fase32Msg, setFase32Msg] = useState("");
 
   useEffect(() => {
     fetch("/api/resultados").then((r) => r.json()).then((data) => {
@@ -42,6 +44,36 @@ export default function ResultadosPage() {
         thirdPlace: data.thirdPlace ?? "",
       });
     });
+  }, []);
+
+  const populateFase32 = useCallback(async () => {
+    setPopulatingFase32(true);
+    setFase32Msg("");
+    try {
+      const res = await fetch("/api/admin/populate-fase32", { method: "POST" });
+      const json = await res.json();
+      if (json.ok) {
+        // Merge computed bracket into local state so the form reflects it immediately
+        setResults((prev) => ({
+          ...prev,
+          knockoutTeams: {
+            ...prev.knockoutTeams,
+            ...Object.fromEntries(
+              Object.entries(json.bracket as Record<string, { teamA: string; teamB: string }>).map(
+                ([id, t]) => [id, t]
+              )
+            ),
+          },
+        }));
+        setFase32Msg("Chaveamento montado ✓");
+      } else {
+        setFase32Msg("Erro ao montar chaveamento");
+      }
+    } catch {
+      setFase32Msg("Erro de conexão");
+    }
+    setPopulatingFase32(false);
+    setTimeout(() => setFase32Msg(""), 4000);
   }, []);
 
   const save = useCallback(async () => {
@@ -189,6 +221,32 @@ export default function ResultadosPage() {
       {/* KNOCKOUT */}
       {PHASES_ORDER.includes(activeTab as Phase) && (
         <div className="space-y-4">
+          {activeTab === "fase32" && (
+            <div className="rounded-[16px] border px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
+              style={{ backgroundColor: "rgba(82,183,136,0.06)", borderColor: "rgba(82,183,136,0.25)" }}>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "#1b4332" }}>
+                  Montar chaveamento automaticamente
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>
+                  Calcula 1º/2º de cada grupo e os 8 melhores 3ºs classificados (Anexo C da FIFA) a partir dos resultados da fase de grupos.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {fase32Msg && (
+                  <span className="text-sm font-semibold" style={{ color: "#2d6a4f" }}>{fase32Msg}</span>
+                )}
+                <button
+                  onClick={populateFase32}
+                  disabled={populatingFase32}
+                  className="px-5 py-2 rounded-full text-white font-semibold text-sm transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "#2d6a4f" }}>
+                  {populatingFase32 ? "Calculando..." : "⚡ Auto-montar"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {activeTab === "final" && (
             <div className="rounded-[16px] border p-5"
               style={{ backgroundColor: "rgba(201,168,76,0.06)", borderColor: "rgba(201,168,76,0.30)" }}>
