@@ -107,17 +107,28 @@ export default async function JogosPage() {
       );
     }
 
-    // Fase32: 3 pts for predicting which team classifies, regardless of result
+    // Fase32: 3 pts if predicted team qualified to fase32 (any game), 4 pts if they also won this game
     if (game.phase === "fase32") {
-      const teams = results.knockoutTeams?.[game.id];
-      if (teams) {
-        const correctNames: string[] = [];
+      const teamsInGame = results.knockoutTeams?.[game.id];
+      if (teamsInGame) {
+        const allFase32Teams = new Set(
+          Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
+        );
+        const classifyNames: string[] = [];
+        const advanceNames: string[] = [];
         for (const { name, preds } of allPreds) {
           const pred = preds.knockout[game.id];
           if (!pred?.winner) continue;
-          if (pred.winner === teams.teamA || pred.winner === teams.teamB) correctNames.push(name);
+          if (allFase32Teams.has(pred.winner)) classifyNames.push(name);
+          if (
+            (pred.winner === teamsInGame.teamA || pred.winner === teamsInGame.teamB) &&
+            knockoutResult && pred.winner === knockoutResult.winner
+          ) advanceNames.push(name);
         }
-        stats.push({ label: "Time classificado (Fase de 32)", pts: PHASE_POINTS.fase32, names: correctNames });
+        stats.push({ label: "Classificou para a Fase de 32", pts: 3, names: classifyNames });
+        if (knockoutResult) {
+          stats.push({ label: "Avançou do jogo (Oitavas)", pts: PHASE_POINTS.oitavas, names: advanceNames });
+        }
       }
     } else if (knockoutResult) {
       const correctNames: string[] = [];

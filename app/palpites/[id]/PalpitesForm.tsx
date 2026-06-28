@@ -557,6 +557,20 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                         && pred.scoreB !== null && pred.scoreB !== undefined
                         && pred.scoreA === pred.scoreB;
 
+                      // Fase32 played: show real teams + criteria
+                      const isFase32 = game.phase === "fase32";
+                      const realBracket = isFase32 ? results.knockoutTeams?.[game.id] : null;
+                      const showRealGame = played && isFase32 && !!realBracket?.teamA && realBracket.teamA !== "TBD";
+                      // classified: team qualified to fase32 in ANY game (global check)
+                      const allFase32Teams = new Set(
+                        Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
+                      );
+                      const classified = showRealGame && !!pred.winner && allFase32Teams.has(pred.winner);
+                      // advancing: team must be IN this game AND win it
+                      const isInThisGame = showRealGame && !!pred.winner &&
+                        (pred.winner === realBracket!.teamA || pred.winner === realBracket!.teamB);
+                      const advancedWinner = isInThisGame && !!result?.winner && pred.winner === result.winner;
+
                       // Source context label
                       const feeders = BRACKET[game.id];
                       const fase32codes = FASE32_GROUPS[game.id];
@@ -599,7 +613,56 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                             )}
                           </div>
 
-                          {!teamsKnown ? (
+                          {showRealGame ? (
+                            /* Played fase32: real teams + criteria breakdown */
+                            <div className="space-y-2">
+                              {/* Real matchup + score */}
+                              <div className="flex items-center gap-2">
+                                <span className="flex-1 text-right text-sm font-semibold truncate"
+                                  style={{ color: pred.winner === realBracket!.teamA ? "#2d6a4f" : "#1b4332" }}>
+                                  {realBracket!.teamA}
+                                </span>
+                                <span className="text-xs font-mono font-bold shrink-0 px-2"
+                                  style={{ color: "#8a8a8a" }}>
+                                  {result?.scoreA} × {result?.scoreB}
+                                </span>
+                                <span className="flex-1 text-sm font-semibold truncate"
+                                  style={{ color: pred.winner === realBracket!.teamB ? "#2d6a4f" : "#1b4332" }}>
+                                  {realBracket!.teamB}
+                                </span>
+                              </div>
+
+                              {/* User's prediction */}
+                              <p className="text-xs text-center" style={{ color: "#8a8a8a" }}>
+                                Sua aposta:{" "}
+                                <span className="font-semibold" style={{ color: "#1b4332" }}>
+                                  {pred.winner ?? "—"}
+                                </span>
+                              </p>
+
+                              {/* Criteria */}
+                              <div className="space-y-1 pt-1" style={{ borderTop: "1px solid rgba(27,67,50,0.08)" }}>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
+                                    {classified ? "✓" : "✗"} Classificou para a Fase de 32
+                                  </span>
+                                  <span className="font-bold" style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
+                                    {classified ? "+3 pts" : "0 pts"}
+                                  </span>
+                                </div>
+                                {isInThisGame && (
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
+                                      {advancedWinner ? "✓" : "✗"} Avançou do jogo
+                                    </span>
+                                    <span className="font-bold" style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
+                                      {advancedWinner ? `+${PHASE_PTS.oitavas} pts` : "0 pts"}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : !teamsKnown ? (
                             <p className="text-xs py-1.5 text-center" style={{ color: "#aaa" }}>
                               ⏳ {sourceHint ? `${sourceHint} — ` : ""}preencha a fase anterior
                             </p>
@@ -615,7 +678,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                                     value={pred.scoreA ?? ""}
                                     onChange={(e) => setKnockoutScore(game.id, "scoreA", e.target.value, teamA, teamB)}
                                     placeholder="—"
-                                    className="w-10 text-center rounded-[8px] border py-1.5 text-sm font-mono outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-10 text-center rounded-lg border py-1.5 text-sm font-mono outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={inputStyle}
                                   />
                                   <span className="text-xs font-bold px-0.5" style={{ color: "#8a8a8a" }}>×</span>
@@ -624,7 +687,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                                     value={pred.scoreB ?? ""}
                                     onChange={(e) => setKnockoutScore(game.id, "scoreB", e.target.value, teamA, teamB)}
                                     placeholder="—"
-                                    className="w-10 text-center rounded-[8px] border py-1.5 text-sm font-mono outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-10 text-center rounded-lg border py-1.5 text-sm font-mono outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={inputStyle}
                                   />
                                 </div>
@@ -643,7 +706,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                                     {[teamA, teamB].map((team) => (
                                       <button key={team}
                                         onClick={() => setKnockoutWinner(game.id, activeWinner === team ? "" : team)}
-                                        className="py-1.5 px-2 rounded-[8px] border text-xs font-semibold transition-all"
+                                        className="py-1.5 px-2 rounded-lg border text-xs font-semibold transition-all"
                                         style={{
                                           backgroundColor: activeWinner === team ? "#1b4332" : "rgba(27,67,50,0.04)",
                                           borderColor: activeWinner === team ? "#1b4332" : "rgba(27,67,50,0.15)",

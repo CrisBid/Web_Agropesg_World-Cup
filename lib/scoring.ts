@@ -124,15 +124,39 @@ export function calcTotalPoints(
     const gameId = Number(gameIdStr);
     const phase = gamesPhaseMap[gameId];
 
-    // Fase de 32: 3 pts when the predicted team is in the bracket,
-    // regardless of whether they win or lose the game.
+    // Fase de 32:
+    // +3 pts if the predicted team qualified to fase32 (appears in ANY fase32 game).
+    // +4 pts additionally if that team also wins THIS specific game (advances to oitavas).
     if (phase === "fase32") {
-      const teams = results.knockoutTeams?.[gameId];
-      if (!teams || !pred.winner) continue;
-      if (pred.winner === teams.teamA || pred.winner === teams.teamB) {
-        const pts = PHASE_POINTS.fase32;
-        total += pts;
-        games.push({ gameId, points: pts, breakdown: [`Time classificado para a Fase de 32 (+${pts})`] });
+      if (!pred.winner) continue;
+
+      const allFase32Teams = new Set(
+        Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
+      );
+
+      let gamePts = 0;
+      const breakdown: string[] = [];
+
+      if (allFase32Teams.has(pred.winner)) {
+        gamePts += 3;
+        breakdown.push("Time classificado para a Fase de 32 (+3)");
+      }
+
+      const teamsInGame = results.knockoutTeams?.[gameId];
+      const knockoutResult = results.knockout[gameId];
+      if (
+        teamsInGame &&
+        (pred.winner === teamsInGame.teamA || pred.winner === teamsInGame.teamB) &&
+        knockoutResult &&
+        pred.winner === knockoutResult.winner
+      ) {
+        gamePts += PHASE_POINTS.oitavas;
+        breakdown.push(`Time que avançou da Fase de 32 (+${PHASE_POINTS.oitavas})`);
+      }
+
+      if (gamePts > 0) {
+        total += gamePts;
+        games.push({ gameId, points: gamePts, breakdown });
       }
       continue;
     }
