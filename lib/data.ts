@@ -387,16 +387,25 @@ export async function deleteGameScheduleOverride(gameId: number): Promise<void> 
 }
 
 export async function getEffectiveGames(): Promise<Game[]> {
-  const overrides = await getGameScheduleOverrides();
+  const [overrides, knockoutTeamRows] = await Promise.all([
+    getGameScheduleOverrides(),
+    prisma.knockoutTeam.findMany(),
+  ]);
+
+  const knockoutTeams: Record<number, { teamA: string; teamB: string }> = {};
+  for (const r of knockoutTeamRows) {
+    knockoutTeams[r.gameId] = { teamA: r.teamA, teamB: r.teamB };
+  }
+
   return GAMES.map((game) => {
     const ov = overrides[game.id];
-    if (!ov) return game;
+    const kt = knockoutTeams[game.id];
     return {
       ...game,
-      date: ov.date ?? game.date,
-      stadium: ov.stadium ?? game.stadium,
-      teamA: ov.teamA ?? game.teamA,
-      teamB: ov.teamB ?? game.teamB,
+      date: ov?.date ?? game.date,
+      stadium: ov?.stadium ?? game.stadium,
+      teamA: ov?.teamA ?? kt?.teamA ?? game.teamA,
+      teamB: ov?.teamB ?? kt?.teamB ?? game.teamB,
     };
   });
 }
