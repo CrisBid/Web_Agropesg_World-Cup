@@ -1,5 +1,5 @@
 import type { Phase } from "./games-data";
-import { PHASE_POINTS } from "./games-data";
+import { GAMES, GROUPS, PHASE_POINTS } from "./games-data";
 
 export interface GroupPrediction {
   scoreA: number | null;
@@ -31,6 +31,53 @@ export interface GamePoints {
   gameId: number;
   points: number;
   breakdown: string[];
+}
+
+const GROUP_GAMES = GAMES.filter((g) => g.phase === "grupos");
+
+// Returns the 32 teams this user predicted would qualify to fase32,
+// derived purely from their group-stage score predictions.
+export function getPredictedFase32Qualifiers(
+  groupPredictions: Record<number, { scoreA: number | null; scoreB: number | null }>
+): string[] {
+  const qualifiers: string[] = [];
+  const thirds: { team: string; Pts: number; SG: number; GP: number }[] = [];
+
+  for (const grp of Object.keys(GROUPS)) {
+    const teams = GROUPS[grp] ?? [];
+    const games = GROUP_GAMES.filter((g) => g.group === grp);
+    const s: Record<string, { Pts: number; GP: number; GC: number; J: number }> = Object.fromEntries(
+      teams.map((t) => [t, { Pts: 0, GP: 0, GC: 0, J: 0 }])
+    );
+
+    for (const game of games) {
+      const r = groupPredictions[game.id];
+      if (!r || r.scoreA === null || r.scoreB === null) continue;
+      const a = s[game.teamA];
+      const b = s[game.teamB];
+      if (!a || !b) continue;
+      a.J++; b.J++;
+      a.GP += r.scoreA!; a.GC += r.scoreB!;
+      b.GP += r.scoreB!; b.GC += r.scoreA!;
+      if (r.scoreA > r.scoreB)      { a.Pts += 3; }
+      else if (r.scoreB > r.scoreA) { b.Pts += 3; }
+      else                           { a.Pts++; b.Pts++; }
+    }
+
+    const sorted = teams
+      .filter((t) => s[t].J > 0)
+      .map((t) => ({ team: t, Pts: s[t].Pts, SG: s[t].GP - s[t].GC, GP: s[t].GP }))
+      .sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
+
+    if (sorted[0]) qualifiers.push(sorted[0].team);
+    if (sorted[1]) qualifiers.push(sorted[1].team);
+    if (sorted[2]) thirds.push(sorted[2]);
+  }
+
+  thirds.sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
+  for (const t of thirds.slice(0, 8)) qualifiers.push(t.team);
+
+  return qualifiers;
 }
 
 export function calcGroupGamePoints(
@@ -119,29 +166,25 @@ export function calcTotalPoints(
     games.push({ gameId, points, breakdown });
   }
 
-  // Knockout
+  // Fase32 classifying: +3 pts per team the user predicted would qualify,
+  // derived from GROUP predictions (not from fase32 game picks).
+  const allFase32Teams = new Set(
+    Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
+  );
+  if (allFase32Teams.size > 0) {
+    for (const team of getPredictedFase32Qualifiers(predictions.groups)) {
+      if (allFase32Teams.has(team)) total += 3;
+    }
+  }
+
+  // Knockout (fase32: only advancing criterion; other phases: winner criterion)
   for (const [gameIdStr, pred] of Object.entries(predictions.knockout)) {
     const gameId = Number(gameIdStr);
     const phase = gamesPhaseMap[gameId];
 
-    // Fase de 32:
-    // +3 pts if the predicted team qualified to fase32 (appears in ANY fase32 game).
-    // +4 pts additionally if that team also wins THIS specific game (advances to oitavas).
     if (phase === "fase32") {
+      // +4 pts if the predicted team is in this game AND wins it (advances to oitavas)
       if (!pred.winner) continue;
-
-      const allFase32Teams = new Set(
-        Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
-      );
-
-      let gamePts = 0;
-      const breakdown: string[] = [];
-
-      if (allFase32Teams.has(pred.winner)) {
-        gamePts += 3;
-        breakdown.push("Time classificado para a Fase de 32 (+3)");
-      }
-
       const teamsInGame = results.knockoutTeams?.[gameId];
       const knockoutResult = results.knockout[gameId];
       if (
@@ -150,13 +193,8 @@ export function calcTotalPoints(
         knockoutResult &&
         pred.winner === knockoutResult.winner
       ) {
-        gamePts += PHASE_POINTS.oitavas;
-        breakdown.push(`Time que avançou da Fase de 32 (+${PHASE_POINTS.oitavas})`);
-      }
-
-      if (gamePts > 0) {
-        total += gamePts;
-        games.push({ gameId, points: gamePts, breakdown });
+        total += PHASE_POINTS.oitavas;
+        games.push({ gameId, points: PHASE_POINTS.oitavas, breakdown: [`Time que avançou da Fase de 32 (+${PHASE_POINTS.oitavas})`] });
       }
       continue;
     }

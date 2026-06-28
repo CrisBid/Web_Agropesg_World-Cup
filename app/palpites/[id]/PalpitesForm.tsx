@@ -483,19 +483,35 @@ export default function PalpitesForm({ participantId, initialPredictions, result
         </div>
       )}
 
-      {/* CLASSIFICADOS F32 — one row per fase32 prediction */}
+      {/* CLASSIFICADOS F32 — 32 teams: top 2 per group + 8 best thirds */}
       {activeTab === "classificados" && (() => {
-        const totalClassified = fase32GamesOrdered.filter((g) => {
-          const w = predictions.knockout[g.id]?.winner;
-          return w && allFase32Teams.has(w);
-        }).length;
-        const totalPts = totalClassified * 3;
         const hasData = allFase32Teams.size > 0;
+
+        // Build: top 2 per group from user's group predictions
+        const directRows: { group: string; pos: number; team: string }[] = [];
+        const thirdRows: { group: string; team: string; Pts: number; SG: number; GP: number }[] = [];
+
+        for (const grp of Object.keys(GROUPS).sort()) {
+          const standings = allGroupStandings[grp] ?? [];
+          if (standings[0]?.J > 0) directRows.push({ group: grp, pos: 1, team: standings[0].team });
+          if (standings[1]?.J > 0) directRows.push({ group: grp, pos: 2, team: standings[1].team });
+          const third = standings[2];
+          if (third?.J > 0) thirdRows.push({ group: grp, team: third.team, Pts: third.Pts, SG: third.SG, GP: third.GP });
+        }
+        thirdRows.sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
+        const top8Thirds = thirdRows.slice(0, 8);
+
+        const allRows = [
+          ...directRows.map((r) => ({ label: `${r.pos}º Grupo ${r.group}`, team: r.team })),
+          ...top8Thirds.map((r) => ({ label: `3º Grupo ${r.group}`, team: r.team })),
+        ];
+        const totalClassified = allRows.filter((r) => allFase32Teams.has(r.team)).length;
+        const totalPts = totalClassified * 3;
 
         return (
           <div className="space-y-4">
             {/* Summary */}
-            <div className="rounded-[16px] border px-5 py-4 flex items-center justify-between"
+            <div className="rounded-2xl border px-5 py-4 flex items-center justify-between"
               style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
               <div>
                 <p className="text-sm font-bold" style={{ color: "#1b4332" }}>
@@ -503,7 +519,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>
                   {hasData
-                    ? `${totalClassified} de ${fase32GamesOrdered.length} apostas certas`
+                    ? `${totalClassified} de 32 times acertados`
                     : "Aguardando resultado da fase de grupos"}
                 </p>
               </div>
@@ -513,47 +529,98 @@ export default function PalpitesForm({ participantId, initialPredictions, result
               </div>
             </div>
 
-            {/* List */}
-            <div className="rounded-[16px] border overflow-hidden"
-              style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
-              {fase32GamesOrdered.map((game, gi) => {
-                const pred = predictions.knockout[game.id]?.winner ?? null;
-                const classified = !!pred && allFase32Teams.has(pred);
-                const codes = FASE32_GROUPS[game.id];
-                const fmtCode = (c: string) =>
-                  c === "3rd" ? "Melhor 3º" : c[0] === "1" ? `1º Gr.${c[1]}` : `2º Gr.${c[1]}`;
-                const slotLabel = codes ? `${fmtCode(codes[0])} × ${fmtCode(codes[1])}` : `Jogo #${game.num}`;
+            {/* Direct qualifiers: top 2 per group */}
+            <div>
+              <p className="text-xs font-bold tracking-[0.15em] uppercase mb-2" style={{ color: "#52b788" }}>
+                1º e 2º de cada grupo
+              </p>
+              <div className="rounded-2xl border overflow-hidden"
+                style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
+                {directRows.map((r, gi) => {
+                  const ok = hasData && allFase32Teams.has(r.team);
+                  return (
+                    <div key={`${r.group}-${r.pos}`}
+                      className="flex items-center justify-between px-4 py-2.5 gap-3"
+                      style={{
+                        borderTop: gi > 0 ? "1px solid rgba(27,67,50,0.06)" : "none",
+                        backgroundColor: ok ? "rgba(82,183,136,0.04)" : "transparent",
+                      }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-bold shrink-0 w-16" style={{ color: "#8a8a8a" }}>
+                          {r.pos}º Gr.{r.group}
+                        </span>
+                        <span className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
+                          {r.team || <span style={{ color: "#bbb" }}>—</span>}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {!hasData ? (
+                          <span className="text-xs" style={{ color: "#bbb" }}>aguardando</span>
+                        ) : (
+                          <>
+                            <span className="text-xs font-semibold" style={{ color: ok ? "#2d6a4f" : "#9a9a9a" }}>
+                              {ok ? "✓ Classificou" : "✗ Não classificou"}
+                            </span>
+                            <span className="ml-2 text-xs font-bold" style={{ color: ok ? "#2d6a4f" : "#9a9a9a" }}>
+                              {ok ? "+3 pts" : "0 pts"}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
-                return (
-                  <div key={game.id}
-                    className="flex items-center justify-between px-4 py-3 gap-3"
-                    style={{
-                      borderTop: gi > 0 ? "1px solid rgba(27,67,50,0.06)" : "none",
-                      backgroundColor: classified ? "rgba(82,183,136,0.04)" : "transparent",
-                    }}>
-                    <div className="min-w-0">
-                      <p className="text-xs" style={{ color: "#8a8a8a" }}>{slotLabel}</p>
-                      <p className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
-                        {pred ?? <span style={{ color: "#bbb" }}>—</span>}
-                      </p>
+            {/* 3rd-place qualifiers */}
+            <div>
+              <p className="text-xs font-bold tracking-[0.15em] uppercase mb-2" style={{ color: "#52b788" }}>
+                Melhores 3ºs lugares (top 8)
+              </p>
+              <div className="rounded-2xl border overflow-hidden"
+                style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
+                {top8Thirds.length === 0 ? (
+                  <p className="px-4 py-3 text-xs" style={{ color: "#bbb" }}>
+                    {predictions.groups && Object.keys(predictions.groups).length < 12
+                      ? "Preencha os palpites de grupos para ver os 3ºs qualificados"
+                      : "Aguardando palpites de grupos"}
+                  </p>
+                ) : top8Thirds.map((r, gi) => {
+                  const ok = hasData && allFase32Teams.has(r.team);
+                  return (
+                    <div key={r.group}
+                      className="flex items-center justify-between px-4 py-2.5 gap-3"
+                      style={{
+                        borderTop: gi > 0 ? "1px solid rgba(27,67,50,0.06)" : "none",
+                        backgroundColor: ok ? "rgba(82,183,136,0.04)" : "transparent",
+                      }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-bold shrink-0 w-16" style={{ color: "#8a8a8a" }}>
+                          3º Gr.{r.group}
+                        </span>
+                        <span className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
+                          {r.team}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {!hasData ? (
+                          <span className="text-xs" style={{ color: "#bbb" }}>aguardando</span>
+                        ) : (
+                          <>
+                            <span className="text-xs font-semibold" style={{ color: ok ? "#2d6a4f" : "#9a9a9a" }}>
+                              {ok ? "✓ Classificou" : "✗ Não classificou"}
+                            </span>
+                            <span className="ml-2 text-xs font-bold" style={{ color: ok ? "#2d6a4f" : "#9a9a9a" }}>
+                              {ok ? "+3 pts" : "0 pts"}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      {!hasData ? (
-                        <span className="text-xs" style={{ color: "#bbb" }}>aguardando</span>
-                      ) : (
-                        <>
-                          <span className="text-xs font-semibold" style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
-                            {classified ? "✓ Classificou" : "✗ Não classificou"}
-                          </span>
-                          <p className="text-xs font-bold" style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
-                            {classified ? "+3 pts" : "0 pts"}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         );
