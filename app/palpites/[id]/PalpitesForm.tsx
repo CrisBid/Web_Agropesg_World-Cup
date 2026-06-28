@@ -166,11 +166,8 @@ export default function PalpitesForm({ participantId, initialPredictions, result
   }
 
   function getTeamsForGame(gameId: number): { teamA: string; teamB: string } {
-    // Admin override always wins
-    const admin = results.knockoutTeams?.[gameId];
-    if (admin?.teamA && admin.teamA !== "TBD") return { teamA: admin.teamA, teamB: admin.teamB };
-
-    // Fase de 32 (games 73-88) — official Copa 2026 bracket with FIFA Annex C logic
+    // Fase de 32 (games 73-88): always derive from this user's own group predictions
+    // (their stored winner was picked against their personal predicted bracket)
     const codes = FASE32_GROUPS[gameId];
     if (codes) {
       const resolve = (code: string, otherCode: string): string => {
