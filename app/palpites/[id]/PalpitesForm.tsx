@@ -69,7 +69,7 @@ function hasResult(game: Game, results: ActualResults) {
 
 export default function PalpitesForm({ participantId, initialPredictions, results, pointsByGame, locked }: Props) {
   const [predictions, setPredictions] = useState<ParticipantPredictions>(initialPredictions);
-  const [activeTab, setActiveTab] = useState<"grupos" | Phase>("grupos");
+  const [activeTab, setActiveTab] = useState<"grupos" | "classificados" | Phase>("grupos");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -208,8 +208,17 @@ export default function PalpitesForm({ participantId, initialPredictions, result
   const filledGroups = Object.values(predictions.groups).filter((p) => p.scoreA !== null && p.scoreB !== null).length;
   const filledKnockout = Object.values(predictions.knockout).filter((p) => p.winner).length;
 
+  // All teams that actually qualified to fase32 (global set used for classifying criterion)
+  const allFase32Teams = new Set(
+    Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
+  );
+  const fase32GamesOrdered = GAMES.filter((g) => g.phase === "fase32").sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
   const tabs = [
     { key: "grupos" as const, label: "Fase de Grupos" },
+    { key: "classificados" as const, label: "Classificados F32" },
     ...PHASES_ORDER.map((ph) => ({ key: ph, label: PHASE_LABELS[ph] })),
   ];
 
@@ -474,6 +483,82 @@ export default function PalpitesForm({ participantId, initialPredictions, result
         </div>
       )}
 
+      {/* CLASSIFICADOS F32 — one row per fase32 prediction */}
+      {activeTab === "classificados" && (() => {
+        const totalClassified = fase32GamesOrdered.filter((g) => {
+          const w = predictions.knockout[g.id]?.winner;
+          return w && allFase32Teams.has(w);
+        }).length;
+        const totalPts = totalClassified * 3;
+        const hasData = allFase32Teams.size > 0;
+
+        return (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="rounded-[16px] border px-5 py-4 flex items-center justify-between"
+              style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#1b4332" }}>
+                  Classificados para a Fase de 32
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>
+                  {hasData
+                    ? `${totalClassified} de ${fase32GamesOrdered.length} apostas certas`
+                    : "Aguardando resultado da fase de grupos"}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black" style={{ color: "#1b4332" }}>{totalPts}</p>
+                <p className="text-xs" style={{ color: "#5a5a5a" }}>pts (+3 cada)</p>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="rounded-[16px] border overflow-hidden"
+              style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
+              {fase32GamesOrdered.map((game, gi) => {
+                const pred = predictions.knockout[game.id]?.winner ?? null;
+                const classified = !!pred && allFase32Teams.has(pred);
+                const codes = FASE32_GROUPS[game.id];
+                const fmtCode = (c: string) =>
+                  c === "3rd" ? "Melhor 3º" : c[0] === "1" ? `1º Gr.${c[1]}` : `2º Gr.${c[1]}`;
+                const slotLabel = codes ? `${fmtCode(codes[0])} × ${fmtCode(codes[1])}` : `Jogo #${game.num}`;
+
+                return (
+                  <div key={game.id}
+                    className="flex items-center justify-between px-4 py-3 gap-3"
+                    style={{
+                      borderTop: gi > 0 ? "1px solid rgba(27,67,50,0.06)" : "none",
+                      backgroundColor: classified ? "rgba(82,183,136,0.04)" : "transparent",
+                    }}>
+                    <div className="min-w-0">
+                      <p className="text-xs" style={{ color: "#8a8a8a" }}>{slotLabel}</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
+                        {pred ?? <span style={{ color: "#bbb" }}>—</span>}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {!hasData ? (
+                        <span className="text-xs" style={{ color: "#bbb" }}>aguardando</span>
+                      ) : (
+                        <>
+                          <span className="text-xs font-semibold" style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
+                            {classified ? "✓ Classificou" : "✗ Não classificou"}
+                          </span>
+                          <p className="text-xs font-bold" style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
+                            {classified ? "+3 pts" : "0 pts"}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* KNOCKOUT — chronological list with score inputs */}
       {PHASES_ORDER.includes(activeTab as Phase) && (
         <div className="space-y-4">
@@ -557,15 +642,10 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                         && pred.scoreB !== null && pred.scoreB !== undefined
                         && pred.scoreA === pred.scoreB;
 
-                      // Fase32 played: show real teams + criteria
+                      // Fase32 played: show real teams + advancing criterion only
                       const isFase32 = game.phase === "fase32";
                       const realBracket = isFase32 ? results.knockoutTeams?.[game.id] : null;
                       const showRealGame = played && isFase32 && !!realBracket?.teamA && realBracket.teamA !== "TBD";
-                      // classified: team qualified to fase32 in ANY game (global check)
-                      const allFase32Teams = new Set(
-                        Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
-                      );
-                      const classified = showRealGame && !!pred.winner && allFase32Teams.has(pred.winner);
                       // advancing: team must be IN this game AND win it
                       const isInThisGame = showRealGame && !!pred.winner &&
                         (pred.winner === realBracket!.teamA || pred.winner === realBracket!.teamB);
@@ -614,12 +694,12 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                           </div>
 
                           {showRealGame ? (
-                            /* Played fase32: real teams + criteria breakdown */
+                            /* Played fase32: real matchup, user's bet, who advanced */
                             <div className="space-y-2">
                               {/* Real matchup + score */}
                               <div className="flex items-center gap-2">
                                 <span className="flex-1 text-right text-sm font-semibold truncate"
-                                  style={{ color: pred.winner === realBracket!.teamA ? "#2d6a4f" : "#1b4332" }}>
+                                  style={{ color: result?.winner === realBracket!.teamA ? "#2d6a4f" : "#1b4332" }}>
                                   {realBracket!.teamA}
                                 </span>
                                 <span className="text-xs font-mono font-bold shrink-0 px-2"
@@ -627,39 +707,30 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                                   {result?.scoreA} × {result?.scoreB}
                                 </span>
                                 <span className="flex-1 text-sm font-semibold truncate"
-                                  style={{ color: pred.winner === realBracket!.teamB ? "#2d6a4f" : "#1b4332" }}>
+                                  style={{ color: result?.winner === realBracket!.teamB ? "#2d6a4f" : "#1b4332" }}>
                                   {realBracket!.teamB}
                                 </span>
                               </div>
 
-                              {/* User's prediction */}
-                              <p className="text-xs text-center" style={{ color: "#8a8a8a" }}>
-                                Sua aposta:{" "}
-                                <span className="font-semibold" style={{ color: "#1b4332" }}>
-                                  {pred.winner ?? "—"}
+                              {/* Sua aposta + quem passou */}
+                              <div className="flex items-center justify-between text-xs"
+                                style={{ borderTop: "1px solid rgba(27,67,50,0.08)", paddingTop: 6 }}>
+                                <span style={{ color: "#8a8a8a" }}>
+                                  Apostou: <span className="font-semibold" style={{ color: "#1b4332" }}>{pred.winner ?? "—"}</span>
                                 </span>
-                              </p>
+                                <span style={{ color: "#8a8a8a" }}>
+                                  Avançou: <span className="font-semibold" style={{ color: "#2d6a4f" }}>{result?.winner}</span>
+                                </span>
+                              </div>
 
-                              {/* Criteria */}
-                              <div className="space-y-1 pt-1" style={{ borderTop: "1px solid rgba(27,67,50,0.08)" }}>
-                                <div className="flex items-center justify-between text-xs">
-                                  <span style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
-                                    {classified ? "✓" : "✗"} Classificou para a Fase de 32
-                                  </span>
-                                  <span className="font-bold" style={{ color: classified ? "#2d6a4f" : "#9a9a9a" }}>
-                                    {classified ? "+3 pts" : "0 pts"}
-                                  </span>
-                                </div>
-                                {isInThisGame && (
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
-                                      {advancedWinner ? "✓" : "✗"} Avançou do jogo
-                                    </span>
-                                    <span className="font-bold" style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
-                                      {advancedWinner ? `+${PHASE_PTS.oitavas} pts` : "0 pts"}
-                                    </span>
-                                  </div>
-                                )}
+                              {/* Advancing criterion */}
+                              <div className="flex items-center justify-between text-xs">
+                                <span style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
+                                  {advancedWinner ? "✓" : "✗"} Acertou quem avançou para as Oitavas
+                                </span>
+                                <span className="font-bold" style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
+                                  {advancedWinner ? `+${PHASE_PTS.oitavas} pts` : "0 pts"}
+                                </span>
                               </div>
                             </div>
                           ) : !teamsKnown ? (
