@@ -107,14 +107,25 @@ export default async function JogosPage() {
       );
     }
 
-    if (knockoutResult) {
+    // Fase32: 3 pts for predicting which team classifies, regardless of result
+    if (game.phase === "fase32") {
+      const teams = results.knockoutTeams?.[game.id];
+      if (teams) {
+        const correctNames: string[] = [];
+        for (const { name, preds } of allPreds) {
+          const pred = preds.knockout[game.id];
+          if (!pred?.winner) continue;
+          if (pred.winner === teams.teamA || pred.winner === teams.teamB) correctNames.push(name);
+        }
+        stats.push({ label: "Time classificado (Fase de 32)", pts: PHASE_POINTS.fase32, names: correctNames });
+      }
+    } else if (knockoutResult) {
       const correctNames: string[] = [];
       for (const { name, preds } of allPreds) {
         const pred = preds.knockout[game.id];
         if (pred?.winner === knockoutResult.winner) correctNames.push(name);
       }
-      const pts = PHASE_POINTS[game.phase];
-      stats.push({ label: "Time correto na fase", pts, names: correctNames });
+      stats.push({ label: "Time correto na fase", pts: PHASE_POINTS[game.phase], names: correctNames });
     }
 
     // --- Prediction distribution ---

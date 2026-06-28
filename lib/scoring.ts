@@ -122,10 +122,23 @@ export function calcTotalPoints(
   // Knockout
   for (const [gameIdStr, pred] of Object.entries(predictions.knockout)) {
     const gameId = Number(gameIdStr);
+    const phase = gamesPhaseMap[gameId];
+
+    // Fase de 32: 3 pts when the predicted team is in the bracket,
+    // regardless of whether they win or lose the game.
+    if (phase === "fase32") {
+      const teams = results.knockoutTeams?.[gameId];
+      if (!teams || !pred.winner) continue;
+      if (pred.winner === teams.teamA || pred.winner === teams.teamB) {
+        const pts = PHASE_POINTS.fase32;
+        total += pts;
+        games.push({ gameId, points: pts, breakdown: [`Time classificado para a Fase de 32 (+${pts})`] });
+      }
+      continue;
+    }
+
     const result = results.knockout[gameId];
     if (!result) continue;
-
-    const phase = gamesPhaseMap[gameId];
     const { points, breakdown } = calcKnockoutGamePoints(pred, result, phase);
     total += points;
     games.push({ gameId, points, breakdown });

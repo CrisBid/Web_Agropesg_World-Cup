@@ -102,7 +102,11 @@ export async function GET(req: Request) {
 
     } else {
       const r = results.knockout[gameId];
-      if (!r) continue;
+      const teams = results.knockoutTeams?.[gameId];
+
+      // Fase32 stat can be shown as soon as the bracket is set, even before the game result
+      const isFase32 = game.phase === "fase32";
+      if (!r && (!isFase32 || !teams)) continue;
 
       const correctNames: string[] = [];
       const predMap = new Map<string, string[]>();
@@ -112,22 +116,31 @@ export async function GET(req: Request) {
         if (!pred?.winner) continue;
         if (!predMap.has(pred.winner)) predMap.set(pred.winner, []);
         predMap.get(pred.winner)!.push(name);
-        if (pred.winner === r.winner) correctNames.push(name);
+        // For fase32: correct = predicted team is in the game (regardless of winner)
+        const correct = isFase32
+          ? (teams != null && (pred.winner === teams.teamA || pred.winner === teams.teamB))
+          : pred.winner === r?.winner;
+        if (correct) correctNames.push(name);
       }
 
+      const isCorrectPred = isFase32
+        ? (pred: string) => teams != null && (pred === teams.teamA || pred === teams.teamB)
+        : (pred: string) => pred === r?.winner;
+
       const predGroups: PostGamePredGroup[] = Array.from(predMap.entries())
-        .map(([prediction, names]) => ({ prediction, names, correct: prediction === r.winner }))
+        .map(([prediction, names]) => ({ prediction, names, correct: isCorrectPred(prediction) }))
         .sort((a, b) => b.names.length - a.names.length);
 
       const totalWithPrediction = predGroups.reduce((s, g) => s + g.names.length, 0);
       const pts = PHASE_POINTS[game.phase];
+      const label = isFase32 ? "Time classificado (Fase de 32)" : "Time correto na fase";
 
       out[gameId] = {
         gameId,
         totalParticipants: participants.length,
         totalWithPrediction,
         criteria: [
-          { label: "Time correto na fase", pts, count: correctNames.length, total: totalWithPrediction, names: correctNames },
+          { label, pts, count: correctNames.length, total: totalWithPrediction, names: correctNames },
         ],
         predGroups,
       };
