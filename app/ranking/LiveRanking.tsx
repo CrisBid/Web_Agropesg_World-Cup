@@ -16,6 +16,8 @@ interface LiveRankingResponse {
   live: boolean;
   postGame?: boolean;
   liveGameIds?: number[];
+  liveCount?: number;
+  recentlyFinishedCount?: number;
   ranking: LiveEntry[];
   clientPollMs?: number;
 }
@@ -139,6 +141,20 @@ export default function LiveRanking({ baseRanking, onLiveChange }: Props) {
             Ranking ao vivo
           </span>
         )}
+        {isLive && (() => {
+          const liveCount = displayData.liveCount ?? 0;
+          const recentCount = displayData.recentlyFinishedCount ?? 0;
+          const total = liveCount + recentCount;
+          if (total <= 1) return null;
+          return (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: "rgba(220,38,38,0.08)", color: "#dc2626" }}>
+              {liveCount > 0 && recentCount > 0
+                ? `${liveCount} ao vivo + ${recentCount} encerrado${recentCount > 1 ? "s" : ""}`
+                : `${total} jogos`}
+            </span>
+          );
+        })()}
         {isLive && lastUpdate && (
           <span className="text-xs" style={{ color: "#9a9a9a" }}>
             atualizado às {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}

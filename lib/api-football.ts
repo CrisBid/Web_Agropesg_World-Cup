@@ -184,6 +184,11 @@ let liveCache: { matches: LiveMatch[]; fetchedAt: number } | null = null;
 let liveFetchInFlight: Promise<void> | null = null;
 const statsCache = new Map<number, { stats: LiveStats; fetchedAt: number }>();
 
+// Tracks matches that were live but disappeared from /fixtures?live=all.
+// Used so simultaneous games that finish slightly before others still contribute
+// to the live ranking until their official result is entered in the DB.
+const recentlyFinishedCache = new Map<number, { match: LiveMatch; finishedAt: number }>();
+
 // ─── Schedule check ────────────────────────────────────────────────────────
 
 export function isAnyGameExpectedLive(): boolean {
@@ -305,6 +310,22 @@ async function doLiveFetch(): Promise<void> {
     const matches: LiveMatch[] = (apiData.response ?? [])
       .filter((f: any) => f.league?.id === LEAGUE_ID)
       .map((f: any) => mapFixture(f, knockoutTeams));
+
+    // Detect matches that were live before but are no longer returned by the API.
+    // Save them so the ranking can still count their last known score until the
+    // admin enters the official result.
+    const now = Date.now();
+    const newIds = new Set(matches.map((m) => m.fixtureId));
+    for (const prev of liveCache?.matches ?? []) {
+      if (!newIds.has(prev.fixtureId) && prev.gameId !== null && !recentlyFinishedCache.has(prev.fixtureId)) {
+        recentlyFinishedCache.set(prev.fixtureId, { match: prev, finishedAt: now });
+      }
+    }
+    // Expire entries older than WINDOW_AFTER
+    for (const [id, entry] of recentlyFinishedCache) {
+      if (now - entry.finishedAt > WINDOW_AFTER) recentlyFinishedCache.delete(id);
+    }
+
     liveCache = { matches, fetchedAt: Date.now() };
   } catch (err) {
     console.error("[live] fetch error:", err);
@@ -318,6 +339,25 @@ async function doLiveFetch(): Promise<void> {
     // Always clear the inflight flag so the next cache-miss starts a new fetch.
     liveFetchInFlight = null;
   }
+}
+
+// Returns matches that recently disappeared from /fixtures?live=all but whose
+// official result hasn't been entered yet. Callers pass officialGameIds so we
+// don't double-count games the DB already has.
+export function getRecentlyFinishedMatches(opts?: {
+  disabledGameIds?: Set<number>;
+  officialGameIds?: Set<number>;
+}): LiveMatch[] {
+  const now = Date.now();
+  return Array.from(recentlyFinishedCache.values())
+    .filter((entry) => {
+      if (now - entry.finishedAt > WINDOW_AFTER) return false;
+      if (entry.match.gameId == null) return false;
+      if (opts?.disabledGameIds?.has(entry.match.gameId)) return false;
+      if (opts?.officialGameIds?.has(entry.match.gameId)) return false;
+      return true;
+    })
+    .map((entry) => entry.match);
 }
 
 export async function getLiveMatches(opts?: {

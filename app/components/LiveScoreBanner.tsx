@@ -408,8 +408,13 @@ export default function LiveScoreBanner({ participantId }: { participantId?: str
 
           if (json.matches.length > 0 && !isTestPost) {
             hadLiveRef.current = true;
-            setFrozenMatches(json.matches);
-            if (json.predStats) setFrozenPredStats(json.predStats);
+            // Merge by fixtureId so games that finish before others aren't lost
+            setFrozenMatches((prev) => {
+              const byId = new Map(prev.map((m) => [m.fixtureId, m]));
+              for (const m of json.matches) byId.set(m.fixtureId, m);
+              return Array.from(byId.values());
+            });
+            if (json.predStats) setFrozenPredStats((prev) => ({ ...prev, ...json.predStats }));
             setGameEndedAt(null);
           } else if (hadLiveRef.current && json.matches.length === 0 && !isTestPost) {
             // Game just ended: start freeze

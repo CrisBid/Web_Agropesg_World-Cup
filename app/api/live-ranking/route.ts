@@ -1,7 +1,7 @@
 import { getParticipants, getResults, getPredictions, getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
-import { getLiveMatches, computeBudget } from "@/lib/api-football";
+import { getLiveMatches, getRecentlyFinishedMatches, computeBudget } from "@/lib/api-football";
 import type { ActualResults } from "@/lib/scoring";
 import type { Phase } from "@/lib/games-data";
 
@@ -65,11 +65,27 @@ export async function GET() {
     disabledGameIds,
   });
 
-  if (liveMatches.length === 0) {
+  const [participants, finalResults] = await Promise.all([getParticipants(), getResults()]);
+
+  // Games that already have an official result in the DB don't need the live cache
+  const officialGameIds = new Set([
+    ...Object.keys(finalResults.groups).map(Number),
+    ...Object.keys(finalResults.knockout).map(Number),
+  ]);
+
+  // Include games that just finished and disappeared from /fixtures?live=all but
+  // whose result the admin hasn't entered yet (common when multiple games are
+  // played simultaneously and finish at slightly different times).
+  const recentlyFinished = getRecentlyFinishedMatches({ disabledGameIds, officialGameIds });
+  const liveFixtureIds = new Set(liveMatches.map((m) => m.fixtureId));
+  const allMatches = [
+    ...liveMatches,
+    ...recentlyFinished.filter((m) => !liveFixtureIds.has(m.fixtureId)),
+  ];
+
+  if (allMatches.length === 0) {
     return Response.json({ live: false, ranking: [], clientPollMs: budget.clientPollMs });
   }
-
-  const [participants, finalResults] = await Promise.all([getParticipants(), getResults()]);
 
   const merged: ActualResults = {
     ...finalResults,
@@ -79,7 +95,7 @@ export async function GET() {
 
   const liveGameIds = new Set<number>();
 
-  for (const m of liveMatches) {
+  for (const m of allMatches) {
     if (m.gameId === null) continue;
     const game = GAMES.find((g) => g.id === m.gameId);
     if (!game) continue;
@@ -114,6 +130,8 @@ export async function GET() {
   return Response.json({
     live: true,
     liveGameIds: Array.from(liveGameIds),
+    liveCount: liveMatches.length,
+    recentlyFinishedCount: recentlyFinished.length,
     ranking,
     clientPollMs: budget.clientPollMs,
   });
