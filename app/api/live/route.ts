@@ -100,10 +100,11 @@ async function buildUserPredictions(uid: string): Promise<Record<number, string>
 export async function GET(req: Request) {
   const uid = new URL(req.url).searchParams.get("uid") ?? null;
 
-  const [enabled, adminSettings, gameOverrides] = await Promise.all([
+  const [enabled, adminSettings, gameOverrides, effectiveGames] = await Promise.all([
     getLiveScoreEnabled(),
     getLiveAdminSettings(),
     getLiveGameOverrides(),
+    getEffectiveGames(),
   ]);
 
   const budget = computeBudget(adminSettings.liveMaxReqPerGame);
@@ -191,7 +192,7 @@ export async function GET(req: Request) {
       .map(async (m) => {
         const game = GAMES.find((g) => g.id === m.gameId);
         if (!game) return;
-        const effectiveGame = games.find((g) => g.id === m.gameId);
+        const effectiveGame = effectiveGames.find((g) => g.id === m.gameId);
         const s = game.phase === "grupos"
           ? await getGroupGameStats(m.gameId!)
           : await getKnockoutGameStats(m.gameId!, effectiveGame?.teamA ?? game.teamA, effectiveGame?.teamB ?? game.teamB);
