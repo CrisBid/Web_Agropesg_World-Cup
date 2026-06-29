@@ -17,6 +17,7 @@ export interface RankingEntry {
   total: number;
   groupPts: number;
   knockoutPts: number;
+  classifyPts: number;
   bonusPts: number;
   champion?: string | null;
   prize: number | null;
@@ -130,8 +131,13 @@ export default function RankingSection({ entries, onLiveChange }: Props) {
                 <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
                   {p.groupPts}
                 </div>
-                <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
-                  {p.knockoutPts}
+                <div className="col-span-2 text-center hidden sm:block">
+                  <span className="text-sm font-semibold" style={{ color: "#5a5a5a" }}>{p.knockoutPts}</span>
+                  {p.classifyPts > 0 && (
+                    <p className="text-[10px] mt-0.5" style={{ color: "#52b788" }}>
+                      {p.classifyPts} classificados
+                    </p>
+                  )}
                 </div>
                 <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#c9a84c" }}>
                   {p.bonusPts > 0 ? `+${p.bonusPts}` : "—"}
@@ -173,7 +179,7 @@ export default function RankingSection({ entries, onLiveChange }: Props) {
                 <span className="text-xl shrink-0">🏅</span>
                 <div>
                   <p className="font-semibold" style={{ color: "#1b4332" }}>Mata-Mata</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>Pontos pelas fases eliminatórias</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>Classificados F32 (3 pts) + fases eliminatórias</p>
                 </div>
               </div>
               <div className="flex gap-3 items-start">

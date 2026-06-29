@@ -29,11 +29,12 @@ export default async function RankingPage() {
   const rawRanking = await Promise.all(
     participants.map(async (p) => {
       const predictions = await getPredictions(p.id);
-      const { total, games, bonuses } = calcTotalPoints(predictions, results, gamesPhaseMap);
+      const { total, games, bonuses, classifyPts } = calcTotalPoints(predictions, results, gamesPhaseMap);
       return {
         id: p.id, name: p.name, total,
         groupPts: games.filter((g) => gamesPhaseMap[g.gameId] === "grupos").reduce((s, g) => s + g.points, 0),
-        knockoutPts: games.filter((g) => gamesPhaseMap[g.gameId] !== "grupos").reduce((s, g) => s + g.points, 0),
+        knockoutPts: classifyPts + games.filter((g) => gamesPhaseMap[g.gameId] !== "grupos").reduce((s, g) => s + g.points, 0),
+        classifyPts,
         bonusPts: bonuses.champion + bonuses.thirdPlace,
         champion: predictions.champion,
       };

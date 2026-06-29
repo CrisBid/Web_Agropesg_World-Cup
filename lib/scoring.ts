@@ -151,7 +151,7 @@ export function calcTotalPoints(
   predictions: ParticipantPredictions,
   results: ActualResults,
   gamesPhaseMap: Record<number, Phase>
-): { total: number; games: GamePoints[]; bonuses: { champion: number; thirdPlace: number } } {
+): { total: number; games: GamePoints[]; bonuses: { champion: number; thirdPlace: number }; classifyPts: number } {
   let total = 0;
   const games: GamePoints[] = [];
 
@@ -168,12 +168,13 @@ export function calcTotalPoints(
 
   // Fase32 classifying: +3 pts per team the user predicted would qualify,
   // derived from GROUP predictions (not from fase32 game picks).
+  let classifyPts = 0;
   const allFase32Teams = new Set(
     Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
   );
   if (allFase32Teams.size > 0) {
     for (const team of getPredictedFase32Qualifiers(predictions.groups)) {
-      if (allFase32Teams.has(team)) total += 3;
+      if (allFase32Teams.has(team)) { classifyPts += 3; total += 3; }
     }
   }
 
@@ -220,5 +221,5 @@ export function calcTotalPoints(
     total += 10;
   }
 
-  return { total, games, bonuses: { champion, thirdPlace } };
+  return { total, games, bonuses: { champion, thirdPlace }, classifyPts };
 }
