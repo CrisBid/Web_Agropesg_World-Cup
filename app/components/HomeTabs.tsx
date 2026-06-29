@@ -85,6 +85,14 @@ function cy(n: number, i: number): number {
   return (TOTAL_H * (2 * i + 1)) / (2 * n);
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatSlotDate(dateStr: string): string {
+  const [, month, day] = dateStr.slice(0, 10).split("-").map(Number);
+  const months = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  return `${day} ${months[month - 1]}`;
+}
+
 // ─── Bracket Slot Card ────────────────────────────────────────────────────────
 
 function BracketSlot({ game, width }: { game: BracketGame | undefined; width: number }) {
@@ -189,7 +197,7 @@ function BracketSlot({ game, width }: { game: BracketGame | undefined; width: nu
         )}
       </div>
 
-      {/* Time footer */}
+      {/* Date + time footer */}
       {isScheduled && (
         <div
           style={{
@@ -201,10 +209,10 @@ function BracketSlot({ game, width }: { game: BracketGame | undefined; width: nu
             borderTop: "1px solid rgba(27,67,50,0.05)",
             backgroundColor: "rgba(27,67,50,0.01)",
             flexShrink: 0,
-            fontFamily: "monospace",
+            whiteSpace: "nowrap",
           }}
         >
-          {time}h
+          {formatSlotDate(game.date)} · {time}h
         </div>
       )}
     </div>
@@ -234,16 +242,17 @@ function VisualBracket({ bracketGames }: { bracketGames: BracketGame[] }) {
       const y1   = cy(curr.ids.length, j * 2);
       const y2   = cy(curr.ids.length, j * 2 + 1);
       const yOut = cy(next.ids.length, j);
-      const x1   = curr.x + COL_W;       // right edge of curr
+      const x1   = curr.x + COL_W;  // right edge of curr
       const xm   = x1 + CONN_W / 2;
-      const x2   = next.x;               // left edge of next
-      paths.push(`M ${x1} ${y1} H ${xm} V ${y2} M ${xm} ${yOut} H ${x2}`);
+      const x2   = next.x;          // left edge of next
+      // H x1 at the end draws the bottom arm back to the second feeder game
+      paths.push(`M ${x1} ${y1} H ${xm} V ${y2} H ${x1} M ${xm} ${yOut} H ${x2}`);
     }
   }
-  // Semi-L → Final (horizontal arm)
+  // Semi-L → Final
   paths.push(`M ${LX.semi + COL_W} ${finalY} H ${FINAL_X}`);
 
-  // Right half: each round feeds into the next (arms go LEFT, inward)
+  // Right half: arms go LEFT (inward toward center)
   const rightRounds = [
     { ids: R_FASE32,  x: RX.fase32  },
     { ids: R_OITAVAS, x: RX.oitavas },
@@ -257,13 +266,14 @@ function VisualBracket({ bracketGames }: { bracketGames: BracketGame[] }) {
       const y1   = cy(curr.ids.length, j * 2);
       const y2   = cy(curr.ids.length, j * 2 + 1);
       const yOut = cy(next.ids.length, j);
-      const x1   = curr.x;              // left edge of curr
+      const x1   = curr.x;           // left edge of curr
       const xm   = x1 - CONN_W / 2;
-      const x2   = next.x + COL_W;     // right edge of next
-      paths.push(`M ${x1} ${y1} H ${xm} V ${y2} M ${xm} ${yOut} H ${x2}`);
+      const x2   = next.x + COL_W;  // right edge of next
+      // H x1 draws the bottom arm back to the second feeder game
+      paths.push(`M ${x1} ${y1} H ${xm} V ${y2} H ${x1} M ${xm} ${yOut} H ${x2}`);
     }
   }
-  // Semi-R → Final (horizontal arm going left to final right edge)
+  // Semi-R → Final
   paths.push(`M ${RX.semi} ${finalY} H ${FINAL_X + FINAL_W}`);
 
   const LABEL_H = 22;
