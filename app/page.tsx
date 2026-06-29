@@ -3,8 +3,8 @@ import { getParticipants, getResults, getPredictions, getEffectiveGames } from "
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
-import GamesSection from "@/app/components/GamesSection";
-import type { GameGroup } from "@/app/components/GamesSection";
+import HomeTabs from "@/app/components/HomeTabs";
+import type { BracketGame, UpcomingDay } from "@/app/components/HomeTabs";
 import LivePodium from "@/app/components/LivePodium";
 
 function todayBRT(): string {
@@ -88,24 +88,41 @@ export default async function Home() {
     effectiveGames
       .filter((g) => g.date.slice(0, 10) >= today && !playedIds.has(g.id))
       .map((g) => g.date.slice(0, 10))
-  )].sort().slice(0, 3); // hoje + próximos 2 dias
+  )].sort().slice(0, 3);
 
-  const gamesByDate: GameGroup[] = distinctDates.map((date) => {
-    const isToday = date === today;
+  function formatDateLabel(date: string) {
     const [year, month, day] = date.split("-").map(Number);
     const d = new Date(Date.UTC(year, month - 1, day));
     const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
     const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-    const label = `${days[d.getUTCDay()]}, ${day} de ${months[month - 1]}`;
-    const games = effectiveGames
+    return `${days[d.getUTCDay()]}, ${day} de ${months[month - 1]}`;
+  }
+
+  const upcomingDays: UpcomingDay[] = distinctDates.map((date) => ({
+    date,
+    isToday: date === today,
+    label: formatDateLabel(date),
+    games: effectiveGames
       .filter((g) => g.date.slice(0, 10) === date && !playedIds.has(g.id))
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((g) => ({
         ...g,
         result: (g.phase === "grupos" ? results.groups[g.id] : results.knockout[g.id]) ?? undefined,
-      }));
-    return { date, isToday, label, games };
-  });
+      })),
+  }));
+
+  // Bracket: todos os jogos eliminatórios com resultado quando disponível
+  const bracketGames: BracketGame[] = effectiveGames
+    .filter((g) => g.phase !== "grupos")
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((g) => ({
+      id: g.id,
+      date: g.date,
+      teamA: g.teamA,
+      teamB: g.teamB,
+      phase: g.phase,
+      result: results.knockout[g.id],
+    }));
 
   const phaseStats = PHASE_CONFIG.map((cfg) => {
     const total = GAMES.filter((g) => g.phase === cfg.phase).length;
@@ -209,8 +226,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ── JOGOS ── */}
-      <GamesSection groups={gamesByDate} />
+      {/* ── COPA / JOGOS / CHAVEAMENTO ── */}
+      <HomeTabs bracketGames={bracketGames} upcomingDays={upcomingDays} />
 
       {/* ── PÓDIO ── */}
       {podiumEntries.length > 0 && <LivePodium baseEntries={podiumEntries} />}

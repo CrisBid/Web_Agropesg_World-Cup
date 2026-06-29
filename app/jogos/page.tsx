@@ -1,8 +1,9 @@
 import { getParticipants, getResults, getPredictions, getEffectiveGames } from "@/lib/data";
 import { PHASE_LABELS, PHASE_POINTS, KNOCKOUT_GAME_PTS } from "@/lib/games-data";
 import type { Phase, Game } from "@/lib/games-data";
-import GameAccordion from "./GameAccordion";
 import type { GameAccordionData, StatRow, PredGroup } from "./GameAccordion";
+import JogosPhases from "./JogosPhases";
+import type { PhaseGroup } from "./JogosPhases";
 
 export const dynamic = "force-dynamic";
 
@@ -11,13 +12,6 @@ function todayBRT(): string {
   return brt.toISOString().slice(0, 10);
 }
 
-function formatDateBR(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const d = new Date(Date.UTC(year, month - 1, day));
-  const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-  return `${days[d.getUTCDay()]}, ${day} de ${months[month - 1]}`;
-}
 
 function groupByPhaseAndDate(games: Game[]) {
   const phases: Phase[] = ["grupos", "fase32", "oitavas", "quartas", "semis", "terceiro", "final"];
@@ -189,8 +183,20 @@ export default async function JogosPage() {
     };
   }
 
+  // Build phase groups for the client component
+  const phaseGroups: PhaseGroup[] = grouped.map(({ phase, dates }) => {
+    const allGameIds = dates.flatMap((d) => d.games.map((g) => g.id));
+    const playedGames = allGameIds.filter((id) => accordionData[id]?.hasResult).length;
+    return {
+      phase,
+      totalGames: allGameIds.length,
+      playedGames,
+      dates: dates.map(({ date, games }) => ({ date, gameIds: games.map((g) => g.id) })),
+    };
+  });
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <p className="text-xs font-semibold tracking-[0.2em] uppercase mb-1" style={{ color: "#52b788" }}>
@@ -204,44 +210,8 @@ export default async function JogosPage() {
         </p>
       </div>
 
-      {/* Phases */}
-      {grouped.map(({ phase, dates }) => (
-        <section key={phase} className="space-y-5">
-          <h2 className="text-xl font-bold" style={{ color: "#1b4332", fontFamily: "var(--font-playfair)" }}>
-            {PHASE_LABELS[phase]}
-          </h2>
-
-          {dates.map(({ date, games }) => {
-            const isToday = date === today;
-            const isPast = date < today;
-            return (
-              <div key={date} className="space-y-2">
-                {/* Date header */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold"
-                    style={{ color: isToday ? "#dc2626" : isPast ? "#9a9a9a" : "#1b4332" }}>
-                    {formatDateBR(date)}
-                    {isToday && (
-                      <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full align-middle"
-                        style={{ backgroundColor: "rgba(220,38,38,0.12)", color: "#dc2626" }}>
-                        HOJE
-                      </span>
-                    )}
-                  </span>
-                  <div className="flex-1 h-px" style={{ backgroundColor: "rgba(27,67,50,0.08)" }} />
-                </div>
-
-                {/* Game accordions */}
-                <div className="space-y-1.5">
-                  {games.map((game) => (
-                    <GameAccordion key={game.id} data={accordionData[game.id]} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </section>
-      ))}
+      {/* Phases as accordions */}
+      <JogosPhases phases={phaseGroups} accordionData={accordionData} today={today} />
     </div>
   );
 }
