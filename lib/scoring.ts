@@ -1,5 +1,5 @@
 import type { Phase } from "./games-data";
-import { GAMES, GROUPS, PHASE_POINTS } from "./games-data";
+import { GAMES, GROUPS, PHASE_POINTS, KNOCKOUT_GAME_PTS } from "./games-data";
 
 export interface GroupPrediction {
   scoreA: number | null;
@@ -137,7 +137,7 @@ export function calcKnockoutGamePoints(
 ): { points: number; breakdown: string[] } {
   if (!prediction.winner || !result.winner) return { points: 0, breakdown: [] };
 
-  const phasePoints = PHASE_POINTS[phase];
+  const phasePoints = KNOCKOUT_GAME_PTS[phase];
   if (prediction.winner === result.winner) {
     return {
       points: phasePoints,

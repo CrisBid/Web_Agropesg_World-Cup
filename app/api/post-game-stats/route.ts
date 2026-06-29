@@ -1,5 +1,5 @@
 import { getParticipants, getResults, getPredictions } from "@/lib/data";
-import { GAMES, PHASE_POINTS } from "@/lib/games-data";
+import { GAMES, KNOCKOUT_GAME_PTS } from "@/lib/games-data";
 
 export interface PostGameCriterion {
   label: string;
@@ -132,7 +132,7 @@ export async function GET(req: Request) {
         .sort((a, b) => b.names.length - a.names.length);
 
       const totalWithPrediction = predGroups.reduce((s, g) => s + g.names.length, 0);
-      const pts = PHASE_POINTS[game.phase];
+      const pts = KNOCKOUT_GAME_PTS[game.phase];
       const label = isFase32 ? "Time classificado (Fase de 32)" : "Time correto na fase";
 
       out[gameId] = {

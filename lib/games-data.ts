@@ -214,3 +214,15 @@ export const PHASE_POINTS: Record<Phase, number> = {
   terceiro: 7,
   final: 8,
 };
+
+// Points earned for correctly predicting the winner of a knockout game.
+// Convention: acertar quem avança DA fase X PARA a fase Y vale PHASE_POINTS[Y].
+export const KNOCKOUT_GAME_PTS: Record<Phase, number> = {
+  grupos: 0,
+  fase32: PHASE_POINTS.oitavas,   // acertar quem vai às oitavas: 4 pts
+  oitavas: PHASE_POINTS.quartas,  // acertar quem vai às quartas: 5 pts
+  quartas: PHASE_POINTS.semis,    // acertar quem vai às semis: 6 pts
+  semis: PHASE_POINTS.final,      // acertar quem vai à final: 8 pts
+  terceiro: PHASE_POINTS.terceiro, // acertar o 3º lugar: 7 pts
+  final: PHASE_POINTS.final,      // acertar o campeão: 8 pts
+};

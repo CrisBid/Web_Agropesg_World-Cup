@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, BRACKET, FASE32_GROUPS } from "@/lib/games-data";
+import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, KNOCKOUT_GAME_PTS, BRACKET, FASE32_GROUPS } from "@/lib/games-data";
 import { ANNEX_C } from "@/lib/annex-c";
 import type { Phase, Game } from "@/lib/games-data";
 import type { ParticipantPredictions, ActualResults } from "@/lib/scoring";
@@ -10,9 +10,7 @@ const GROUP_GAMES = GAMES.filter((g) => g.phase === "grupos");
 const KNOCKOUT_GAMES = GAMES.filter((g) => g.phase !== "grupos");
 const PHASES_ORDER: Phase[] = ["fase32", "oitavas", "quartas", "semis", "terceiro", "final"];
 
-const PHASE_PTS: Record<Phase, number> = {
-  grupos: 0, fase32: 3, oitavas: 4, quartas: 5, semis: 6, terceiro: 7, final: 8,
-};
+const PHASE_PTS = KNOCKOUT_GAME_PTS;
 
 interface Standing { team: string; J: number; V: number; E: number; D: number; GP: number; GC: number; SG: number; Pts: number }
 interface ThirdQ { team: string; group: string; Pts: number; SG: number; GP: number }
@@ -747,7 +745,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                               style={{ color: "#1b4332" }}>{timeStr}</span>
                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
                               style={{ backgroundColor: "rgba(201,168,76,0.15)", color: "#8b7028" }}>
-                              +{isFase32 ? PHASE_PTS.oitavas : PHASE_PTS[game.phase]} pts
+                              +{PHASE_PTS[game.phase]} pts
                             </span>
                             <span className="text-xs truncate hidden sm:block" style={{ color: "#8a8a8a" }}>
                               {game.stadium.split(",")[0]}
@@ -814,7 +812,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                                     {advancedWinner ? "✓" : "✗"} Acertou quem avançou para as Oitavas
                                   </span>
                                   <span className="font-bold" style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
-                                    {advancedWinner ? `+${PHASE_PTS.oitavas} pts` : "0 pts"}
+                                    {advancedWinner ? `+${PHASE_PTS.fase32} pts` : "0 pts"}
                                   </span>
                                 </div>
                               </div>

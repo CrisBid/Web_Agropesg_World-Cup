@@ -1,5 +1,5 @@
 import { getParticipants, getResults, getPredictions, getEffectiveGames } from "@/lib/data";
-import { PHASE_LABELS, PHASE_POINTS } from "@/lib/games-data";
+import { PHASE_LABELS, PHASE_POINTS, KNOCKOUT_GAME_PTS } from "@/lib/games-data";
 import type { Phase, Game } from "@/lib/games-data";
 import GameAccordion from "./GameAccordion";
 import type { GameAccordionData, StatRow, PredGroup } from "./GameAccordion";
@@ -136,7 +136,7 @@ export default async function JogosPage() {
         const pred = preds.knockout[game.id];
         if (pred?.winner === knockoutResult.winner) correctNames.push(name);
       }
-      stats.push({ label: "Time correto na fase", pts: PHASE_POINTS[game.phase], names: correctNames });
+      stats.push({ label: "Time correto na fase", pts: KNOCKOUT_GAME_PTS[game.phase], names: correctNames });
     }
 
     // --- Prediction distribution ---
