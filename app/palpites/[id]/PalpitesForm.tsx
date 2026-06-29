@@ -747,7 +747,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                               style={{ color: "#1b4332" }}>{timeStr}</span>
                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
                               style={{ backgroundColor: "rgba(201,168,76,0.15)", color: "#8b7028" }}>
-                              +{PHASE_PTS[game.phase]} pts
+                              +{isFase32 ? PHASE_PTS.oitavas : PHASE_PTS[game.phase]} pts
                             </span>
                             <span className="text-xs truncate hidden sm:block" style={{ color: "#8a8a8a" }}>
                               {game.stadium.split(",")[0]}
@@ -761,43 +761,62 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                           </div>
 
                           {showRealGame ? (
-                            /* Played fase32: real matchup, user's bet, who advanced */
+                            /* Played fase32: user's predicted matchup as main, real result below */
                             <div className="space-y-2">
-                              {/* Real matchup + score */}
+                              {/* User's predicted matchup */}
                               <div className="flex items-center gap-2">
                                 <span className="flex-1 text-right text-sm font-semibold truncate"
-                                  style={{ color: result?.winner === realBracket!.teamA ? "#2d6a4f" : "#1b4332" }}>
-                                  {realBracket!.teamA}
+                                  style={{ color: pred.winner === teamA ? "#2d6a4f" : "#1b4332" }}>
+                                  {teamA}
                                 </span>
-                                <span className="text-xs font-mono font-bold shrink-0 px-2"
-                                  style={{ color: "#8a8a8a" }}>
-                                  {result?.scoreA} × {result?.scoreB}
-                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <div className="w-8 text-center rounded-lg border py-1.5 text-sm font-mono opacity-50"
+                                    style={{ borderColor: "rgba(27,67,50,0.2)", color: "#1b4332" }}>
+                                    {pred.scoreA ?? "—"}
+                                  </div>
+                                  <span className="text-xs font-bold px-0.5" style={{ color: "#8a8a8a" }}>×</span>
+                                  <div className="w-8 text-center rounded-lg border py-1.5 text-sm font-mono opacity-50"
+                                    style={{ borderColor: "rgba(27,67,50,0.2)", color: "#1b4332" }}>
+                                    {pred.scoreB ?? "—"}
+                                  </div>
+                                </div>
                                 <span className="flex-1 text-sm font-semibold truncate"
-                                  style={{ color: result?.winner === realBracket!.teamB ? "#2d6a4f" : "#1b4332" }}>
-                                  {realBracket!.teamB}
+                                  style={{ color: pred.winner === teamB ? "#2d6a4f" : "#1b4332" }}>
+                                  {teamB}
                                 </span>
                               </div>
-
-                              {/* Sua aposta + quem passou */}
-                              <div className="flex items-center justify-between text-xs"
-                                style={{ borderTop: "1px solid rgba(27,67,50,0.08)", paddingTop: 6 }}>
-                                <span style={{ color: "#8a8a8a" }}>
-                                  Apostou: <span className="font-semibold" style={{ color: "#1b4332" }}>{pred.winner ?? "—"}</span>
-                                </span>
-                                <span style={{ color: "#8a8a8a" }}>
-                                  Avançou: <span className="font-semibold" style={{ color: "#2d6a4f" }}>{result?.winner}</span>
-                                </span>
+                              <div className="text-xs text-center" style={{ color: "#8a8a8a" }}>
+                                Apostou em: <span className="font-semibold" style={{ color: "#1b4332" }}>{pred.winner ?? "—"}</span>
                               </div>
 
-                              {/* Advancing criterion */}
-                              <div className="flex items-center justify-between text-xs">
-                                <span style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
-                                  {advancedWinner ? "✓" : "✗"} Acertou quem avançou para as Oitavas
-                                </span>
-                                <span className="font-bold" style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
-                                  {advancedWinner ? `+${PHASE_PTS.oitavas} pts` : "0 pts"}
-                                </span>
+                              {/* Real game result */}
+                              <div className="rounded-lg px-3 py-2 space-y-1"
+                                style={{ backgroundColor: "rgba(27,67,50,0.04)", borderTop: "1px solid rgba(27,67,50,0.08)" }}>
+                                <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: "#8a8a8a" }}>
+                                  Resultado real
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <span className="flex-1 text-right text-xs font-semibold truncate"
+                                    style={{ color: result?.winner === realBracket!.teamA ? "#2d6a4f" : "#5a5a5a" }}>
+                                    {realBracket!.teamA}
+                                  </span>
+                                  <span className="text-xs font-mono font-bold shrink-0 px-1"
+                                    style={{ color: "#8a8a8a" }}>
+                                    {result?.scoreA} × {result?.scoreB}
+                                  </span>
+                                  <span className="flex-1 text-xs font-semibold truncate"
+                                    style={{ color: result?.winner === realBracket!.teamB ? "#2d6a4f" : "#5a5a5a" }}>
+                                    {realBracket!.teamB}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs pt-1">
+                                  <span style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
+                                    {advancedWinner ? "✓" : "✗"} Acertou quem avançou para as Oitavas
+                                  </span>
+                                  <span className="font-bold" style={{ color: advancedWinner ? "#2d6a4f" : "#9a9a9a" }}>
+                                    {advancedWinner ? `+${PHASE_PTS.oitavas} pts` : "0 pts"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           ) : !teamsKnown ? (
