@@ -243,6 +243,25 @@ export interface GamePredictionStats {
   othersCount: number;
 }
 
+export async function getKnockoutGameStats(gameId: number, teamA: string, teamB: string): Promise<GamePredictionStats> {
+  const rows = await prisma.knockoutPrediction.findMany({
+    where: { gameId, winner: { not: null } },
+  });
+
+  const total = rows.length;
+  if (total === 0) return { total: 0, homeWins: 0, draws: 0, awayWins: 0, topScores: [], othersCount: 0 };
+
+  let homeWins = 0;
+  let awayWins = 0;
+
+  for (const r of rows) {
+    if (r.winner === teamA) homeWins++;
+    else if (r.winner === teamB) awayWins++;
+  }
+
+  return { total, homeWins, draws: 0, awayWins, topScores: [], othersCount: total - homeWins - awayWins };
+}
+
 export async function getGroupGameStats(gameId: number): Promise<GamePredictionStats> {
   const rows = await prisma.groupPrediction.findMany({
     where: { gameId, scoreA: { not: null }, scoreB: { not: null } },

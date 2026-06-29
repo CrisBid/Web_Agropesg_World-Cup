@@ -121,10 +121,12 @@ function GameRow({ game, result, stats }: {
             <>
               <div className="space-y-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9a9a9a" }}>
-                  Resultado esperado · {stats.total} participante{stats.total !== 1 ? "s" : ""}
+                  {game.phase === "grupos" ? "Resultado esperado" : "Quem avança"} · {stats.total} participante{stats.total !== 1 ? "s" : ""}
                 </p>
                 <OutcomeBar label={`${game.teamA} vence`} count={stats.homeWins} total={stats.total} color="#1b4332" />
-                <OutcomeBar label="Empate" count={stats.draws} total={stats.total} color="#c9a84c" />
+                {game.phase === "grupos" && (
+                  <OutcomeBar label="Empate" count={stats.draws} total={stats.total} color="#c9a84c" />
+                )}
                 <OutcomeBar label={`${game.teamB} vence`} count={stats.awayWins} total={stats.total} color="#52b788" />
               </div>
               {stats.topScores.length > 0 && (

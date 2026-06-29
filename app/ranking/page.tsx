@@ -1,4 +1,4 @@
-import { getParticipants, getResults, getPredictions, getGroupGameStats, getEffectiveGames } from "@/lib/data";
+import { getParticipants, getResults, getPredictions, getGroupGameStats, getKnockoutGameStats, getEffectiveGames } from "@/lib/data";
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
@@ -55,7 +55,9 @@ export default async function RankingPage() {
 
   const todayItems: TodayGameItem[] = await Promise.all(
     todaysGames.map(async (g) => {
-      const stats = g.phase === "grupos" ? await getGroupGameStats(g.id) : { total: 0, homeWins: 0, draws: 0, awayWins: 0, topScores: [], othersCount: 0 };
+      const stats = g.phase === "grupos"
+      ? await getGroupGameStats(g.id)
+      : await getKnockoutGameStats(g.id, g.teamA, g.teamB);
       const result = g.phase === "grupos" ? results.groups[g.id] : results.knockout[g.id];
       return { game: g, result: result ?? null, stats };
     })
