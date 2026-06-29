@@ -97,10 +97,11 @@ export default function RankingSection({ entries, onLiveChange }: Props) {
             <div className="grid grid-cols-12 gap-2 px-0 text-xs font-semibold uppercase tracking-wide"
               style={{ color: "#5a5a5a" }}>
               <div className="col-span-1">#</div>
-              <div className="col-span-5 sm:col-span-3">Participante</div>
+              <div className="col-span-5 sm:col-span-2">Participante</div>
               <div className="col-span-2 text-center hidden sm:block">Grupos</div>
+              <div className="col-span-2 text-center hidden sm:block">Classif. F32</div>
               <div className="col-span-2 text-center hidden sm:block">Mata-mata</div>
-              <div className="col-span-2 text-center hidden sm:block">Bônus</div>
+              <div className="col-span-1 text-center hidden sm:block">Bônus</div>
               <div className="col-span-6 sm:col-span-2 text-right">Total / Prêmio</div>
             </div>
 
@@ -121,7 +122,7 @@ export default function RankingSection({ entries, onLiveChange }: Props) {
                   )}
                 </div>
 
-                <div className="col-span-5 sm:col-span-3">
+                <div className="col-span-5 sm:col-span-2">
                   <p className="font-bold text-sm leading-tight" style={{ color: "#1b4332" }}>{p.name}</p>
                   {p.champion && (
                     <p className="text-xs mt-0.5" style={{ color: "#c9a84c" }}>🏆 {p.champion}</p>
@@ -131,15 +132,13 @@ export default function RankingSection({ entries, onLiveChange }: Props) {
                 <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
                   {p.groupPts}
                 </div>
-                <div className="col-span-2 text-center hidden sm:block">
-                  <span className="text-sm font-semibold" style={{ color: "#5a5a5a" }}>{p.knockoutPts}</span>
-                  {p.classifyPts > 0 && (
-                    <p className="text-[10px] mt-0.5" style={{ color: "#52b788" }}>
-                      {p.classifyPts} classificados
-                    </p>
-                  )}
+                <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#52b788" }}>
+                  {p.classifyPts > 0 ? p.classifyPts : "—"}
                 </div>
-                <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#c9a84c" }}>
+                <div className="col-span-2 text-center hidden sm:block text-sm font-semibold" style={{ color: "#5a5a5a" }}>
+                  {p.knockoutPts}
+                </div>
+                <div className="col-span-1 text-center hidden sm:block text-sm font-semibold" style={{ color: "#c9a84c" }}>
                   {p.bonusPts > 0 ? `+${p.bonusPts}` : "—"}
                 </div>
 
@@ -166,7 +165,7 @@ export default function RankingSection({ entries, onLiveChange }: Props) {
             ))}
 
             {/* Legend */}
-            <div className="rounded-[16px] border p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mt-2"
+            <div className="rounded-[16px] border p-5 grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm mt-2"
               style={{ backgroundColor: "rgba(27,67,50,0.02)", borderColor: "rgba(27,67,50,0.06)" }}>
               <div className="flex gap-3 items-start">
                 <span className="text-xl shrink-0">⚽</span>
@@ -176,10 +175,17 @@ export default function RankingSection({ entries, onLiveChange }: Props) {
                 </div>
               </div>
               <div className="flex gap-3 items-start">
+                <span className="text-xl shrink-0">🎯</span>
+                <div>
+                  <p className="font-semibold" style={{ color: "#52b788" }}>Classif. F32</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>3 pts por time acertado na Fase de 32</p>
+                </div>
+              </div>
+              <div className="flex gap-3 items-start">
                 <span className="text-xl shrink-0">🏅</span>
                 <div>
-                  <p className="font-semibold" style={{ color: "#1b4332" }}>Mata-Mata</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>Classificados F32 (3 pts) + fases eliminatórias</p>
+                  <p className="font-semibold" style={{ color: "#1b4332" }}>Mata-mata</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#5a5a5a" }}>Pontos pelas fases eliminatórias</p>
                 </div>
               </div>
               <div className="flex gap-3 items-start">

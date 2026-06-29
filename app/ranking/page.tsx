@@ -33,7 +33,7 @@ export default async function RankingPage() {
       return {
         id: p.id, name: p.name, total,
         groupPts: games.filter((g) => gamesPhaseMap[g.gameId] === "grupos").reduce((s, g) => s + g.points, 0),
-        knockoutPts: classifyPts + games.filter((g) => gamesPhaseMap[g.gameId] !== "grupos").reduce((s, g) => s + g.points, 0),
+        knockoutPts: games.filter((g) => gamesPhaseMap[g.gameId] !== "grupos").reduce((s, g) => s + g.points, 0),
         classifyPts,
         bonusPts: bonuses.champion + bonuses.thirdPlace,
         champion: predictions.champion,
