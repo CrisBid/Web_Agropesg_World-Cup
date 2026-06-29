@@ -1,5 +1,5 @@
 import { getLiveMatchesWithStats, isAnyGameExpectedLive, computeBudget } from "@/lib/api-football";
-import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getGroupGameStats, getPredictions, getEffectiveGames } from "@/lib/data";
+import { getLiveScoreEnabled, getLiveAdminSettings, getLiveGameOverrides, getGroupGameStats, getKnockoutGameStats, getPredictions, getEffectiveGames } from "@/lib/data";
 import { GAMES } from "@/lib/games-data";
 import type { GamePredictionStats } from "@/lib/data";
 
@@ -191,9 +191,10 @@ export async function GET(req: Request) {
       .map(async (m) => {
         const game = GAMES.find((g) => g.id === m.gameId);
         if (!game) return;
+        const effectiveGame = games.find((g) => g.id === m.gameId);
         const s = game.phase === "grupos"
           ? await getGroupGameStats(m.gameId!)
-          : { total: 0, homeWins: 0, draws: 0, awayWins: 0, topScores: [], othersCount: 0 };
+          : await getKnockoutGameStats(m.gameId!, effectiveGame?.teamA ?? game.teamA, effectiveGame?.teamB ?? game.teamB);
         predStats[m.fixtureId] = s;
       })
   );

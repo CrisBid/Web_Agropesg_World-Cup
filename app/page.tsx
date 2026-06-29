@@ -99,6 +99,7 @@ export default async function Home() {
     const label = `${days[d.getUTCDay()]}, ${day} de ${months[month - 1]}`;
     const games = effectiveGames
       .filter((g) => g.date.slice(0, 10) === date && !playedIds.has(g.id))
+      .sort((a, b) => a.date.localeCompare(b.date))
       .map((g) => ({
         ...g,
         result: (g.phase === "grupos" ? results.groups[g.id] : results.knockout[g.id]) ?? undefined,

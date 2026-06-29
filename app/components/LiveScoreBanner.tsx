@@ -60,13 +60,14 @@ function StatBar({ label, home, away, unit = "" }: { label: string; home: number
   );
 }
 
-function PredictionBar({ homeTeam, awayTeam, stats }: {
-  homeTeam: string; awayTeam: string; stats: GamePredictionStats;
+function PredictionBar({ homeTeam, awayTeam, stats, isKnockout }: {
+  homeTeam: string; awayTeam: string; stats: GamePredictionStats; isKnockout?: boolean;
 }) {
   if (stats.total === 0) return null;
-  const homePct  = Math.round((stats.homeWins / stats.total) * 100);
-  const drawPct  = Math.round((stats.draws    / stats.total) * 100);
-  const awayPct  = 100 - homePct - drawPct;
+  const homePct   = Math.round((stats.homeWins    / stats.total) * 100);
+  const drawPct   = isKnockout ? 0 : Math.round((stats.draws / stats.total) * 100);
+  const othersPct = isKnockout ? Math.round((stats.othersCount / stats.total) * 100) : 0;
+  const awayPct   = 100 - homePct - drawPct - othersPct;
 
   return (
     <div className="px-4 pb-3 pt-2 space-y-1.5 border-t" style={{ borderColor: "rgba(27,67,50,0.06)" }}>
@@ -84,18 +85,28 @@ function PredictionBar({ homeTeam, awayTeam, stats }: {
         {awayPct > 0 && (
           <div className="h-full transition-all duration-700" style={{ width: `${awayPct}%`, backgroundColor: "#52b788" }} />
         )}
+        {othersPct > 0 && (
+          <div className="h-full transition-all duration-700" style={{ width: `${othersPct}%`, backgroundColor: "#d1d5db" }} />
+        )}
       </div>
       {/* Labels */}
       <div className="flex items-center justify-between text-[10px]">
-        <span className="font-semibold truncate max-w-[35%]" style={{ color: "#1b4332" }}>
+        <span className="font-semibold truncate max-w-[30%]" style={{ color: "#1b4332" }}>
           {homeTeam} <span className="font-black">{homePct}%</span>
         </span>
-        <span className="font-semibold shrink-0" style={{ color: "#a16207" }}>
-          Empate <span className="font-black">{drawPct}%</span>
-        </span>
-        <span className="font-semibold truncate max-w-[35%] text-right" style={{ color: "#2d6a4f" }}>
+        {!isKnockout && (
+          <span className="font-semibold shrink-0" style={{ color: "#a16207" }}>
+            Empate <span className="font-black">{drawPct}%</span>
+          </span>
+        )}
+        <span className="font-semibold truncate max-w-[30%] text-right" style={{ color: "#2d6a4f" }}>
           {awayTeam} <span className="font-black">{awayPct}%</span>
         </span>
+        {isKnockout && othersPct > 0 && (
+          <span className="font-semibold shrink-0" style={{ color: "#9a9a9a" }}>
+            Outros <span className="font-black">{othersPct}%</span>
+          </span>
+        )}
       </div>
     </div>
   );
@@ -291,6 +302,10 @@ function MatchCard({ match, expanded, onToggle, frozen, predStats, userPredictio
           homeTeam={match.homeTeam}
           awayTeam={match.awayTeam}
           stats={predStats}
+          isKnockout={match.gameId != null && (() => {
+            const g = GAMES.find((x) => x.id === match.gameId);
+            return g ? g.phase !== "grupos" : false;
+          })()}
         />
       )}
 

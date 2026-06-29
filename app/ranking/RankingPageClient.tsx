@@ -128,6 +128,9 @@ function GameRow({ game, result, stats }: {
                   <OutcomeBar label="Empate" count={stats.draws} total={stats.total} color="#c9a84c" />
                 )}
                 <OutcomeBar label={`${game.teamB} vence`} count={stats.awayWins} total={stats.total} color="#52b788" />
+                {game.phase !== "grupos" && stats.othersCount > 0 && (
+                  <OutcomeBar label="Outros times" count={stats.othersCount} total={stats.total} color="#c9a84c" />
+                )}
               </div>
               {stats.topScores.length > 0 && (
                 <div className="space-y-2">
