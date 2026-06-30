@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { GAMES } from "./games-data";
 import type { Game } from "./games-data";
 import type { ParticipantPredictions, ActualResults } from "./scoring";
+import { getDerivedClassificationSlots } from "./scoring";
 
 // ─── Participants ───────────────────────────────────────────────────────────
 
@@ -86,15 +87,18 @@ export async function getPredictions(participantId: string): Promise<Participant
     knockout[r.gameId] = { winner: r.winner, scoreA: r.scoreA, scoreB: r.scoreB };
   }
 
-  const classificationOverride: Record<string, string> = {};
-  for (const r of classificationRows) classificationOverride[r.slot] = r.team;
+  // Merge: derived slots are the baseline, explicit DB overrides take precedence per slot.
+  // This ensures that saving one slot doesn't wipe out the other 31 derived teams.
+  const mergedClassificationOverride = classificationRows.length > 0
+    ? { ...getDerivedClassificationSlots(groups), ...Object.fromEntries(classificationRows.map((r) => [r.slot, r.team])) }
+    : undefined;
 
   return {
     groups,
     knockout,
     champion: participant?.predictedChampion ?? null,
     thirdPlace: participant?.predictedThirdPlace ?? null,
-    ...(classificationRows.length > 0 ? { classificationOverride } : {}),
+    ...(mergedClassificationOverride ? { classificationOverride: mergedClassificationOverride } : {}),
   };
 }
 
