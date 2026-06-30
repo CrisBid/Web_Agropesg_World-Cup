@@ -711,10 +711,16 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                       const isFase32 = game.phase === "fase32";
                       const realBracket = isFase32 ? results.knockoutTeams?.[game.id] : null;
                       const showRealGame = played && isFase32 && !!realBracket?.teamA && realBracket.teamA !== "TBD";
-                      // advancing: team must be IN this game AND win it
-                      const isInThisGame = showRealGame && !!pred.winner &&
-                        (pred.winner === realBracket!.teamA || pred.winner === realBracket!.teamB);
-                      const advancedWinner = isInThisGame && !!result?.winner && pred.winner === result.winner;
+                      // Phase-based: awarded if predicted team won ANY fase32 game (not just this slot)
+                      const fase32Winners = isFase32
+                        ? new Set(
+                            GAMES
+                              .filter(g => g.phase === "fase32")
+                              .map(g => results.knockout[g.id]?.winner)
+                              .filter((w): w is string => !!w)
+                          )
+                        : new Set<string>();
+                      const advancedWinner = showRealGame && !!pred.winner && fase32Winners.has(pred.winner);
 
                       // Source context label
                       const feeders = BRACKET[game.id];
