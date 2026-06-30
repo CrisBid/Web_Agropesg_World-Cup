@@ -58,7 +58,11 @@ function SelectRow({
   saving?: boolean;
   onChange: (val: string | null) => void;
 }) {
-  const isOverridden = !!value && value !== derived;
+  const hasOverride = !!value;
+  const displayValue = value || derived || "";
+  const isDerived = !hasOverride && !!derived;
+  const isConflict = hasOverride && !!derived && value !== derived;
+
   return (
     <div className="flex items-center gap-3 px-5 py-3">
       <span className="text-xs font-semibold shrink-0 w-28 truncate" style={{ color: "#9a9a9a" }}>
@@ -66,23 +70,33 @@ function SelectRow({
       </span>
       <div className="flex-1 min-w-0">
         <select
-          value={value}
+          value={displayValue}
           onChange={(e) => onChange(e.target.value || null)}
           className="w-full rounded-[10px] border px-3 py-2 text-sm outline-none"
           style={{
-            backgroundColor: value ? (isOverridden ? "rgba(234,179,8,0.07)" : "rgba(27,67,50,0.04)") : "#f7f5ef",
-            borderColor: isOverridden ? "rgba(234,179,8,0.5)" : value ? "rgba(27,67,50,0.25)" : "rgba(27,67,50,0.12)",
-            color: value ? "#1b4332" : "#9a9a9a",
-            fontWeight: value ? 600 : 400,
+            backgroundColor: isConflict
+              ? "rgba(234,179,8,0.07)"
+              : displayValue ? "rgba(27,67,50,0.04)" : "#f7f5ef",
+            borderColor: isConflict
+              ? "rgba(234,179,8,0.5)"
+              : displayValue ? "rgba(27,67,50,0.20)" : "rgba(27,67,50,0.12)",
+            color: displayValue ? "#1b4332" : "#9a9a9a",
+            fontWeight: displayValue ? 600 : 400,
+            fontStyle: isDerived ? "italic" : "normal",
           }}>
           <option value="">— sem previsão —</option>
           {teams.map((team) => (
             <option key={team} value={team}>{team}</option>
           ))}
         </select>
-        {derived && (
-          <p className="text-[10px] mt-0.5 px-1" style={{ color: isOverridden ? "#92400e" : "#aaa" }}>
-            {isOverridden ? `⚠️ palpite: ${derived}` : `palpite: ${derived}`}
+        {isDerived && (
+          <p className="text-[10px] mt-0.5 px-1" style={{ color: "#b0b0b0" }}>
+            palpite (não salvo)
+          </p>
+        )}
+        {isConflict && (
+          <p className="text-[10px] mt-0.5 px-1" style={{ color: "#92400e" }}>
+            ⚠️ palpite: {derived}
           </p>
         )}
       </div>
