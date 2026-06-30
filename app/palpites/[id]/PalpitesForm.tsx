@@ -551,7 +551,6 @@ export default function PalpitesForm({ participantId, initialPredictions, result
             <div>
               <p className="text-xs font-bold tracking-[0.15em] uppercase mb-2" style={{ color: "#52b788" }}>
                 1º e 2º de cada grupo
-                {hasOverride && <span className="ml-2 normal-case font-normal" style={{ color: "#92400e" }}>⚙️ definido manualmente</span>}
               </p>
               <div className="rounded-2xl border overflow-hidden"
                 style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>

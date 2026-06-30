@@ -68,6 +68,7 @@ function PhoneInput({
 
 export default function ParticipantesPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [overrideIds, setOverrideIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
@@ -85,8 +86,12 @@ export default function ParticipantesPage() {
   useEffect(() => { load(); }, []);
 
   async function load() {
-    const res = await fetch("/api/participantes");
-    if (res.ok) setParticipants(await res.json());
+    const [partRes, ovRes] = await Promise.all([
+      fetch("/api/participantes"),
+      fetch("/api/admin/has-overrides"),
+    ]);
+    if (partRes.ok) setParticipants(await partRes.json());
+    if (ovRes.ok) setOverrideIds(new Set(await ovRes.json()));
   }
 
   // ── Add ──────────────────────────────────────────────────────────────────
@@ -337,6 +342,10 @@ export default function ParticipantesPage() {
                       {p.lockedAt && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                           style={{ backgroundColor: "rgba(220,38,38,0.10)", color: "#dc2626" }}>🔒 bloqueado</span>
+                      )}
+                      {overrideIds.has(p.id) && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ backgroundColor: "rgba(234,179,8,0.15)", color: "#92400e" }}>⚙️ bracket manual</span>
                       )}
                     </div>
                     <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: placeholder ? "#a16207" : "#5a5a5a" }}>
