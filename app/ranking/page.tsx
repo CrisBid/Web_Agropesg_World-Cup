@@ -51,7 +51,9 @@ export default async function RankingPage() {
 
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
   const today = todayBRT();
-  const todaysGames = effectiveGames.filter((g) => g.date.slice(0, 10) === today);
+  const todaysGames = effectiveGames
+    .filter((g) => g.date.slice(0, 10) === today)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   const todayItems: TodayGameItem[] = await Promise.all(
     todaysGames.map(async (g) => {

@@ -1,5 +1,6 @@
-import { GAMES, GROUPS, FASE32_GROUPS } from "./games-data";
+import { GAMES, GROUPS, FASE32_GROUPS, BRACKET } from "./games-data";
 import { ANNEX_C } from "./annex-c";
+import type { ActualResults } from "./scoring";
 
 const GROUP_GAMES = GAMES.filter((g) => g.phase === "grupos");
 
@@ -82,4 +83,37 @@ export function computeFase32Bracket(
     };
   }
   return bracket;
+}
+
+export function deriveKnockoutGameTeams(
+  results: ActualResults
+): Record<number, { teamA: string; teamB: string }> {
+  const derived: Record<number, { teamA: string; teamB: string }> = {};
+
+  // Oitavas ← fase32, Quartas ← oitavas, Semis ← quartas, Final ← semis
+  const orderedIds = [89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 104];
+  for (const gameId of orderedIds) {
+    const feeders = BRACKET[gameId];
+    if (!feeders) continue;
+    const [feederA, feederB] = feeders;
+    const winnerA = results.knockout[feederA]?.winner;
+    const winnerB = results.knockout[feederB]?.winner;
+    if (winnerA || winnerB) {
+      derived[gameId] = { teamA: winnerA ?? "TBD", teamB: winnerB ?? "TBD" };
+    }
+  }
+
+  // Terceiro (103): perdedores das semis 101 e 102
+  const losers = [101, 102].map((semiId) => {
+    const winner = results.knockout[semiId]?.winner;
+    if (!winner) return undefined;
+    const teams = derived[semiId] ?? results.knockoutTeams?.[semiId];
+    if (!teams) return undefined;
+    return winner === teams.teamA ? teams.teamB : teams.teamA;
+  });
+  if (losers[0] || losers[1]) {
+    derived[103] = { teamA: losers[0] ?? "TBD", teamB: losers[1] ?? "TBD" };
+  }
+
+  return derived;
 }

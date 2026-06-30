@@ -1,6 +1,7 @@
 import { getParticipants, getResults, getPredictions, getEffectiveGames } from "@/lib/data";
 import { PHASE_LABELS, PHASE_POINTS, KNOCKOUT_GAME_PTS } from "@/lib/games-data";
 import type { Phase, Game } from "@/lib/games-data";
+import { deriveKnockoutGameTeams } from "@/lib/bracket";
 import type { GameAccordionData, StatRow, PredGroup } from "./GameAccordion";
 import JogosPhases from "./JogosPhases";
 import type { PhaseGroup } from "./JogosPhases";
@@ -28,7 +29,10 @@ function groupByPhaseAndDate(games: Game[]) {
     }
     const dates = Array.from(dateMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, games]) => ({ date, games }));
+      .map(([date, games]) => ({
+        date,
+        games: games.slice().sort((a, b) => a.date.localeCompare(b.date)),
+      }));
     result.push({ phase, dates });
   }
 
@@ -53,6 +57,7 @@ export default async function JogosPage() {
   const today = todayBRT();
   const totalPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
   const grouped = groupByPhaseAndDate(games);
+  const derivedTeams = deriveKnockoutGameTeams(results);
 
   // Build accordion data for each game
   const accordionData: Record<number, GameAccordionData> = {};
@@ -171,8 +176,8 @@ export default async function JogosPage() {
     accordionData[game.id] = {
       gameId: game.id,
       num: game.num,
-      teamA: game.teamA,
-      teamB: game.teamB,
+      teamA: derivedTeams[game.id]?.teamA ?? game.teamA,
+      teamB: derivedTeams[game.id]?.teamB ?? game.teamB,
       time: game.date.slice(11, 16),
       phaseLabel,
       resultLabel,

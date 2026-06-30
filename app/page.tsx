@@ -3,6 +3,7 @@ import { getParticipants, getResults, getPredictions, getEffectiveGames } from "
 import { calcTotalPoints } from "@/lib/scoring";
 import { GAMES } from "@/lib/games-data";
 import type { Phase } from "@/lib/games-data";
+import { deriveKnockoutGameTeams } from "@/lib/bracket";
 import HomeTabs from "@/app/components/HomeTabs";
 import type { BracketGame, UpcomingDay } from "@/app/components/HomeTabs";
 import LivePodium from "@/app/components/LivePodium";
@@ -112,14 +113,15 @@ export default async function Home() {
   }));
 
   // Bracket: todos os jogos eliminatórios com resultado quando disponível
+  const derivedTeams = deriveKnockoutGameTeams(results);
   const bracketGames: BracketGame[] = effectiveGames
     .filter((g) => g.phase !== "grupos")
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((g) => ({
       id: g.id,
       date: g.date,
-      teamA: g.teamA,
-      teamB: g.teamB,
+      teamA: derivedTeams[g.id]?.teamA ?? g.teamA,
+      teamB: derivedTeams[g.id]?.teamB ?? g.teamB,
       phase: g.phase,
       result: results.knockout[g.id],
     }));
