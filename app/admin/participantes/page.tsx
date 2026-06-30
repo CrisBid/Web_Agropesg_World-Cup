@@ -353,6 +353,11 @@ export default function ParticipantesPage() {
                       style={{ backgroundColor: "rgba(82,183,136,0.12)", color: "#1b4332" }}>
                       Palpites
                     </Link>
+                    <Link href={`/admin/palpites/${p.id}`}
+                      className="text-xs font-medium px-3 py-1.5 rounded-full transition-all hover:opacity-80 hidden sm:block"
+                      style={{ backgroundColor: "rgba(74,144,217,0.12)", color: "#1d4ed8" }}>
+                      Bracket
+                    </Link>
                     <button onClick={() => isEditing ? cancelEdit() : startEdit(p)}
                       className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all hover:opacity-80"
                       style={isEditing
