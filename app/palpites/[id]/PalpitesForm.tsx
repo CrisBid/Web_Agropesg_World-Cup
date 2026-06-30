@@ -756,7 +756,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                             <span className="text-xs truncate hidden sm:block" style={{ color: "#8a8a8a" }}>
                               {game.stadium.split(",")[0]}
                             </span>
-                            {played && pts !== undefined && (
+                            {pts !== undefined && (played || pts > 0) && (
                               <span className="ml-auto text-xs font-bold shrink-0"
                                 style={{ color: pts > 0 ? "#2d6a4f" : "#8a8a8a" }}>
                                 {pts > 0 ? `+${pts}` : "0"} pts
@@ -893,6 +893,15 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                                 </div>
                               )}
                             </>
+                          )}
+
+                          {/* Fase32: predicted team advanced in a different real slot (game not yet played here) */}
+                          {isFase32 && !played && !!pred.winner && fase32Winners.has(pred.winner) && (
+                            <div className="flex items-center justify-between text-xs mt-2 pt-2"
+                              style={{ borderTop: "1px solid rgba(27,67,50,0.08)" }}>
+                              <span style={{ color: "#2d6a4f" }}>✓ {pred.winner} avançou para as Oitavas</span>
+                              <span className="font-bold" style={{ color: "#2d6a4f" }}>+{PHASE_PTS.fase32} pts</span>
+                            </div>
                           )}
                         </div>
                       );
