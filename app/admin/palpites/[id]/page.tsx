@@ -1,6 +1,7 @@
 import { getParticipants, getResults } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { ALL_TEAMS } from "@/lib/games-data";
+import { getDerivedClassificationSlots } from "@/lib/scoring";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import BracketOverrideClient from "./BracketOverrideClient";
@@ -13,10 +14,11 @@ export default async function AdminBracketPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [participants, knockoutRows, classificationRows, results] = await Promise.all([
+  const [participants, knockoutRows, classificationRows, groupPredRows, results] = await Promise.all([
     getParticipants(),
     prisma.knockoutPrediction.findMany({ where: { participantId: id } }),
     prisma.classificationOverride.findMany({ where: { participantId: id } }),
+    prisma.groupPrediction.findMany({ where: { participantId: id } }),
     getResults(),
   ]);
 
@@ -28,6 +30,11 @@ export default async function AdminBracketPage({
 
   const initialClassification: Record<string, string> = {};
   for (const r of classificationRows) initialClassification[r.slot] = r.team;
+
+  // Derived slot→team from participant's group predictions (shown as reference in the UI)
+  const groupPreds: Record<number, { scoreA: number | null; scoreB: number | null }> = {};
+  for (const r of groupPredRows) groupPreds[r.gameId] = { scoreA: r.scoreA, scoreB: r.scoreB };
+  const derivedClassification = getDerivedClassificationSlots(groupPreds);
 
   // Build extended team list: ALL_TEAMS + any team in the real bracket that uses
   // a different name (e.g. admin entered a corrected/updated team name).
@@ -79,6 +86,7 @@ export default async function AdminBracketPage({
         participantId={id}
         initialKnockout={initialKnockout}
         initialClassification={initialClassification}
+        derivedClassification={derivedClassification}
         allTeams={allTeams}
         knockoutTeams={results.knockoutTeams ?? {}}
         knockoutResults={results.knockout}

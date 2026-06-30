@@ -1,5 +1,5 @@
 import type { Phase } from "./games-data";
-import { GAMES, GROUPS, PHASE_POINTS, KNOCKOUT_GAME_PTS } from "./games-data";
+import { GAMES, GROUPS, PHASE_POINTS, KNOCKOUT_GAME_PTS, THIRD_PLACE_SLOTS } from "./games-data";
 
 export interface GroupPrediction {
   scoreA: number | null;
@@ -80,6 +80,52 @@ export function getPredictedFase32Qualifiers(
   for (const t of thirds.slice(0, 8)) qualifiers.push(t.team);
 
   return qualifiers;
+}
+
+// Returns a slot→team map derived from group predictions (same logic as getPredictedFase32Qualifiers
+// but with explicit slot keys instead of a flat array).
+export function getDerivedClassificationSlots(
+  groupPredictions: Record<number, { scoreA: number | null; scoreB: number | null }>
+): Record<string, string> {
+  const slots: Record<string, string> = {};
+  const thirds: { team: string; Pts: number; SG: number; GP: number }[] = [];
+
+  for (const grp of Object.keys(GROUPS)) {
+    const teams = GROUPS[grp] ?? [];
+    const games = GROUP_GAMES.filter((g) => g.group === grp);
+    const s: Record<string, { Pts: number; GP: number; GC: number; J: number }> = Object.fromEntries(
+      teams.map((t) => [t, { Pts: 0, GP: 0, GC: 0, J: 0 }])
+    );
+
+    for (const game of games) {
+      const r = groupPredictions[game.id];
+      if (!r || r.scoreA === null || r.scoreB === null) continue;
+      const a = s[game.teamA]; const b = s[game.teamB];
+      if (!a || !b) continue;
+      a.J++; b.J++;
+      a.GP += r.scoreA!; a.GC += r.scoreB!;
+      b.GP += r.scoreB!; b.GC += r.scoreA!;
+      if (r.scoreA > r.scoreB)      { a.Pts += 3; }
+      else if (r.scoreB > r.scoreA) { b.Pts += 3; }
+      else                           { a.Pts++; b.Pts++; }
+    }
+
+    const sorted = teams
+      .filter((t) => s[t].J > 0)
+      .map((t) => ({ team: t, Pts: s[t].Pts, SG: s[t].GP - s[t].GC, GP: s[t].GP }))
+      .sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
+
+    if (sorted[0]) slots[`1${grp}`] = sorted[0].team;
+    if (sorted[1]) slots[`2${grp}`] = sorted[1].team;
+    if (sorted[2]) thirds.push(sorted[2]);
+  }
+
+  thirds.sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
+  THIRD_PLACE_SLOTS.forEach((gameId, i) => {
+    if (thirds[i]) slots[`3rd_${gameId}`] = thirds[i].team;
+  });
+
+  return slots;
 }
 
 export function calcGroupGamePoints(

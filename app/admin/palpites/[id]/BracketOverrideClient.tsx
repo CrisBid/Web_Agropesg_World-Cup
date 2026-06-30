@@ -24,6 +24,7 @@ interface Props {
   participantId: string;
   initialKnockout: Record<number, string | null>;
   initialClassification: Record<string, string>;
+  derivedClassification: Record<string, string>;
   allTeams: string[];
   knockoutTeams: Record<number, { teamA: string; teamB: string }>;
   knockoutResults: Record<number, { winner: string; scoreA?: number; scoreB?: number }>;
@@ -45,45 +46,48 @@ function gameHint(gameId: number): string {
 function SelectRow({
   label,
   value,
+  derived,
   teams,
-  hint,
   saving,
   onChange,
 }: {
   label: string;
   value: string;
+  derived?: string;
   teams: string[];
-  hint?: string;
   saving?: boolean;
   onChange: (val: string | null) => void;
 }) {
+  const isOverridden = !!value && value !== derived;
   return (
     <div className="flex items-center gap-3 px-5 py-3">
       <span className="text-xs font-semibold shrink-0 w-28 truncate" style={{ color: "#9a9a9a" }}>
         {label}
       </span>
-      {hint && (
-        <span className="text-xs hidden md:block shrink-0 truncate max-w-[130px]" style={{ color: "#c0c0c0" }}>
-          {hint}
-        </span>
-      )}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value || null)}
-        className="flex-1 rounded-[10px] border px-3 py-2 text-sm outline-none"
-        style={{
-          backgroundColor: value ? "rgba(27,67,50,0.04)" : "#f7f5ef",
-          borderColor: value ? "rgba(27,67,50,0.25)" : "rgba(27,67,50,0.12)",
-          color: value ? "#1b4332" : "#9a9a9a",
-          fontWeight: value ? 600 : 400,
-        }}>
-        <option value="">— sem previsão —</option>
-        {teams.map((team) => (
-          <option key={team} value={team}>{team}</option>
-        ))}
-      </select>
-      <span className="text-xs w-14 text-right shrink-0 font-medium" style={{ color: saving ? "#aaa" : "transparent" }}>
-        {saving ? "..." : "·"}
+      <div className="flex-1 min-w-0">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value || null)}
+          className="w-full rounded-[10px] border px-3 py-2 text-sm outline-none"
+          style={{
+            backgroundColor: value ? (isOverridden ? "rgba(234,179,8,0.07)" : "rgba(27,67,50,0.04)") : "#f7f5ef",
+            borderColor: isOverridden ? "rgba(234,179,8,0.5)" : value ? "rgba(27,67,50,0.25)" : "rgba(27,67,50,0.12)",
+            color: value ? "#1b4332" : "#9a9a9a",
+            fontWeight: value ? 600 : 400,
+          }}>
+          <option value="">— sem previsão —</option>
+          {teams.map((team) => (
+            <option key={team} value={team}>{team}</option>
+          ))}
+        </select>
+        {derived && (
+          <p className="text-[10px] mt-0.5 px-1" style={{ color: isOverridden ? "#92400e" : "#aaa" }}>
+            {isOverridden ? `⚠️ palpite: ${derived}` : `palpite: ${derived}`}
+          </p>
+        )}
+      </div>
+      <span className="text-xs w-10 text-right shrink-0 font-medium" style={{ color: "#aaa" }}>
+        {saving ? "..." : ""}
       </span>
     </div>
   );
@@ -93,6 +97,7 @@ export default function BracketOverrideClient({
   participantId,
   initialKnockout,
   initialClassification,
+  derivedClassification,
   allTeams,
   knockoutTeams,
   knockoutResults,
@@ -177,6 +182,7 @@ export default function BracketOverrideClient({
               <SelectRow
                 label={s.label}
                 value={classification[s.slot] ?? ""}
+                derived={derivedClassification[s.slot]}
                 teams={allTeams}
                 saving={classifStatus[s.slot]}
                 onChange={(val) => setClassifSlot(s.slot, val)}
@@ -198,6 +204,7 @@ export default function BracketOverrideClient({
               <SelectRow
                 label={s.label}
                 value={classification[s.slot] ?? ""}
+                derived={derivedClassification[s.slot]}
                 teams={allTeams}
                 saving={classifStatus[s.slot]}
                 onChange={(val) => setClassifSlot(s.slot, val)}
