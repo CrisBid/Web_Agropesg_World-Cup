@@ -119,10 +119,7 @@ export default async function JogosPage() {
           const pred = preds.knockout[game.id];
           if (!pred?.winner) continue;
           if (allFase32Teams.has(pred.winner)) classifyNames.push(name);
-          if (
-            (pred.winner === teamsInGame.teamA || pred.winner === teamsInGame.teamB) &&
-            knockoutResult && pred.winner === knockoutResult.winner
-          ) advanceNames.push(name);
+          if (knockoutResult && pred.winner === knockoutResult.winner) advanceNames.push(name);
         }
         stats.push({ label: "Classificou para a Fase de 32", pts: 3, names: classifyNames });
         if (knockoutResult) {

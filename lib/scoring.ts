@@ -178,33 +178,40 @@ export function calcTotalPoints(
     }
   }
 
-  // Knockout (fase32: only advancing criterion; other phases: winner criterion)
+  // Knockout advancement points:
+  // A user earns points for each team they predicted to advance from a phase
+  // if that team actually advanced — regardless of which specific game they assigned it to.
+  // Points are awarded at most once per team per phase.
+
+  // Build set of actual winners per phase
+  const winnersByPhase = new Map<Phase, Set<string>>();
+  for (const [gameIdStr, result] of Object.entries(results.knockout)) {
+    const phase = gamesPhaseMap[Number(gameIdStr)];
+    if (!phase || !result.winner) continue;
+    if (!winnersByPhase.has(phase)) winnersByPhase.set(phase, new Set());
+    winnersByPhase.get(phase)!.add(result.winner);
+  }
+
+  const awardedTeams = new Map<Phase, Set<string>>();
+
   for (const [gameIdStr, pred] of Object.entries(predictions.knockout)) {
     const gameId = Number(gameIdStr);
     const phase = gamesPhaseMap[gameId];
+    if (!pred.winner || !phase) continue;
 
-    if (phase === "fase32") {
-      // +4 pts if the predicted team is in this game AND wins it (advances to oitavas)
-      if (!pred.winner) continue;
-      const teamsInGame = results.knockoutTeams?.[gameId];
-      const knockoutResult = results.knockout[gameId];
-      if (
-        teamsInGame &&
-        (pred.winner === teamsInGame.teamA || pred.winner === teamsInGame.teamB) &&
-        knockoutResult &&
-        pred.winner === knockoutResult.winner
-      ) {
-        total += PHASE_POINTS.oitavas;
-        games.push({ gameId, points: PHASE_POINTS.oitavas, breakdown: [`Time que avançou da Fase de 32 (+${PHASE_POINTS.oitavas})`] });
-      }
-      continue;
+    const actualWinners = winnersByPhase.get(phase);
+    if (!actualWinners?.has(pred.winner)) continue;
+
+    if (!awardedTeams.has(phase)) awardedTeams.set(phase, new Set());
+    const awarded = awardedTeams.get(phase)!;
+    if (awarded.has(pred.winner)) continue; // já pontuou este time nesta fase
+
+    awarded.add(pred.winner);
+    const pts = KNOCKOUT_GAME_PTS[phase];
+    if (pts > 0) {
+      total += pts;
+      games.push({ gameId, points: pts, breakdown: [`Time que avançou da fase (+${pts})`] });
     }
-
-    const result = results.knockout[gameId];
-    if (!result) continue;
-    const { points, breakdown } = calcKnockoutGamePoints(pred, result, phase);
-    total += points;
-    games.push({ gameId, points, breakdown });
   }
 
   // Bonuses
