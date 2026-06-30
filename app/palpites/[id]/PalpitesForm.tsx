@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, KNOCKOUT_GAME_PTS, BRACKET, FASE32_GROUPS } from "@/lib/games-data";
+import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, KNOCKOUT_GAME_PTS, BRACKET, FASE32_GROUPS, THIRD_PLACE_SLOTS } from "@/lib/games-data";
 import { ANNEX_C } from "@/lib/annex-c";
 import type { Phase, Game } from "@/lib/games-data";
 import type { ParticipantPredictions, ActualResults } from "@/lib/scoring";
@@ -164,10 +164,18 @@ export default function PalpitesForm({ participantId, initialPredictions, result
   }
 
   function getTeamsForGame(gameId: number): { teamA: string; teamB: string } {
-    // Fase de 32 (games 73-88): always derive from this user's own group predictions
-    // (their stored winner was picked against their personal predicted bracket)
+    // Fase de 32 (games 73-88)
     const codes = FASE32_GROUPS[gameId];
     if (codes) {
+      const override = predictions.classificationOverride;
+      if (override && Object.keys(override).length > 0) {
+        // Admin override: resolve slot directly (no group-prediction derivation)
+        const resolve = (code: string): string => {
+          if (code === "3rd") return override[`3rd_${gameId}`] ?? "TBD";
+          return override[code] ?? "TBD";
+        };
+        return { teamA: resolve(codes[0]), teamB: resolve(codes[1]) };
+      }
       const resolve = (code: string, otherCode: string): string => {
         if (code === "3rd") {
           if (predictedThirdQ.length < 8) return "TBD";
@@ -484,26 +492,38 @@ export default function PalpitesForm({ participantId, initialPredictions, result
       {/* CLASSIFICADOS F32 — 32 teams: top 2 per group + 8 best thirds */}
       {activeTab === "classificados" && (() => {
         const hasData = allFase32Teams.size > 0;
+        const override = predictions.classificationOverride;
+        const hasOverride = !!override && Object.keys(override).length > 0;
 
-        // Build: top 2 per group from user's group predictions
-        const directRows: { group: string; pos: number; team: string }[] = [];
-        const thirdRows: { group: string; team: string; Pts: number; SG: number; GP: number }[] = [];
+        // Build rows: prefer admin override, fall back to group-prediction derivation
+        const directRows: { label: string; team: string }[] = [];
+        const top8Thirds: { label: string; team: string }[] = [];
 
-        for (const grp of Object.keys(GROUPS).sort()) {
-          const standings = allGroupStandings[grp] ?? [];
-          if (standings[0]?.J > 0) directRows.push({ group: grp, pos: 1, team: standings[0].team });
-          if (standings[1]?.J > 0) directRows.push({ group: grp, pos: 2, team: standings[1].team });
-          const third = standings[2];
-          if (third?.J > 0) thirdRows.push({ group: grp, team: third.team, Pts: third.Pts, SG: third.SG, GP: third.GP });
+        if (hasOverride) {
+          for (const grp of Object.keys(GROUPS).sort()) {
+            directRows.push({ label: `1º Gr.${grp}`, team: override![`1${grp}`] ?? "" });
+            directRows.push({ label: `2º Gr.${grp}`, team: override![`2${grp}`] ?? "" });
+          }
+          THIRD_PLACE_SLOTS.forEach((gameId, i) => {
+            top8Thirds.push({ label: `3º #${i + 1}`, team: override![`3rd_${gameId}`] ?? "" });
+          });
+        } else {
+          const derivedThirdRows: { group: string; team: string; Pts: number; SG: number; GP: number }[] = [];
+          for (const grp of Object.keys(GROUPS).sort()) {
+            const standings = allGroupStandings[grp] ?? [];
+            if (standings[0]?.J > 0) directRows.push({ label: `1º Gr.${grp}`, team: standings[0].team });
+            if (standings[1]?.J > 0) directRows.push({ label: `2º Gr.${grp}`, team: standings[1].team });
+            const third = standings[2];
+            if (third?.J > 0) derivedThirdRows.push({ group: grp, team: third.team, Pts: third.Pts, SG: third.SG, GP: third.GP });
+          }
+          derivedThirdRows.sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
+          derivedThirdRows.slice(0, 8).forEach((r) => {
+            top8Thirds.push({ label: `3º Gr.${r.group}`, team: r.team });
+          });
         }
-        thirdRows.sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
-        const top8Thirds = thirdRows.slice(0, 8);
 
-        const allRows = [
-          ...directRows.map((r) => ({ label: `${r.pos}º Grupo ${r.group}`, team: r.team })),
-          ...top8Thirds.map((r) => ({ label: `3º Grupo ${r.group}`, team: r.team })),
-        ];
-        const totalClassified = allRows.filter((r) => allFase32Teams.has(r.team)).length;
+        const allRows = [...directRows, ...top8Thirds];
+        const totalClassified = allRows.filter((r) => r.team && allFase32Teams.has(r.team)).length;
         const totalPts = totalClassified * 3;
 
         return (
@@ -531,13 +551,18 @@ export default function PalpitesForm({ participantId, initialPredictions, result
             <div>
               <p className="text-xs font-bold tracking-[0.15em] uppercase mb-2" style={{ color: "#52b788" }}>
                 1º e 2º de cada grupo
+                {hasOverride && <span className="ml-2 normal-case font-normal" style={{ color: "#92400e" }}>⚙️ definido manualmente</span>}
               </p>
               <div className="rounded-2xl border overflow-hidden"
                 style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
-                {directRows.map((r, gi) => {
-                  const ok = hasData && allFase32Teams.has(r.team);
+                {directRows.length === 0 ? (
+                  <p className="px-4 py-3 text-xs" style={{ color: "#bbb" }}>
+                    Preencha os palpites de grupos para ver os classificados
+                  </p>
+                ) : directRows.map((r, gi) => {
+                  const ok = hasData && !!r.team && allFase32Teams.has(r.team);
                   return (
-                    <div key={`${r.group}-${r.pos}`}
+                    <div key={r.label}
                       className="flex items-center justify-between px-4 py-2.5 gap-3"
                       style={{
                         borderTop: gi > 0 ? "1px solid rgba(27,67,50,0.06)" : "none",
@@ -545,7 +570,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                       }}>
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xs font-bold shrink-0 w-16" style={{ color: "#8a8a8a" }}>
-                          {r.pos}º Gr.{r.group}
+                          {r.label}
                         </span>
                         <span className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
                           {r.team || <span style={{ color: "#bbb" }}>—</span>}
@@ -578,16 +603,16 @@ export default function PalpitesForm({ participantId, initialPredictions, result
               </p>
               <div className="rounded-2xl border overflow-hidden"
                 style={{ backgroundColor: "white", borderColor: "rgba(27,67,50,0.08)" }}>
-                {top8Thirds.length === 0 ? (
+                {top8Thirds.length === 0 && !hasOverride ? (
                   <p className="px-4 py-3 text-xs" style={{ color: "#bbb" }}>
                     {predictions.groups && Object.keys(predictions.groups).length < 12
                       ? "Preencha os palpites de grupos para ver os 3ºs qualificados"
                       : "Aguardando palpites de grupos"}
                   </p>
                 ) : top8Thirds.map((r, gi) => {
-                  const ok = hasData && allFase32Teams.has(r.team);
+                  const ok = hasData && !!r.team && allFase32Teams.has(r.team);
                   return (
-                    <div key={r.group}
+                    <div key={r.label}
                       className="flex items-center justify-between px-4 py-2.5 gap-3"
                       style={{
                         borderTop: gi > 0 ? "1px solid rgba(27,67,50,0.06)" : "none",
@@ -595,10 +620,10 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                       }}>
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xs font-bold shrink-0 w-16" style={{ color: "#8a8a8a" }}>
-                          3º Gr.{r.group}
+                          {r.label}
                         </span>
                         <span className="text-sm font-semibold truncate" style={{ color: "#1b4332" }}>
-                          {r.team}
+                          {r.team || <span style={{ color: "#bbb" }}>—</span>}
                         </span>
                       </div>
                       <div className="text-right shrink-0">

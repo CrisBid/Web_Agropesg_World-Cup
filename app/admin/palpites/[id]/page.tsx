@@ -1,5 +1,6 @@
-import { getParticipants } from "@/lib/data";
+import { getParticipants, getResults } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
+import { ALL_TEAMS } from "@/lib/games-data";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import BracketOverrideClient from "./BracketOverrideClient";
@@ -12,16 +13,37 @@ export default async function AdminBracketPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [participants, rows] = await Promise.all([
+  const [participants, knockoutRows, classificationRows, results] = await Promise.all([
     getParticipants(),
     prisma.knockoutPrediction.findMany({ where: { participantId: id } }),
+    prisma.classificationOverride.findMany({ where: { participantId: id } }),
+    getResults(),
   ]);
 
   const participant = participants.find((p) => p.id === id);
   if (!participant) notFound();
 
   const initialKnockout: Record<number, string | null> = {};
-  for (const r of rows) initialKnockout[r.gameId] = r.winner ?? null;
+  for (const r of knockoutRows) initialKnockout[r.gameId] = r.winner ?? null;
+
+  const initialClassification: Record<string, string> = {};
+  for (const r of classificationRows) initialClassification[r.slot] = r.team;
+
+  // Build extended team list: ALL_TEAMS + any team in the real bracket that uses
+  // a different name (e.g. admin entered a corrected/updated team name).
+  const baseSet = new Set(ALL_TEAMS);
+  const extra = new Set<string>();
+  for (const t of Object.values(results.knockoutTeams ?? {})) {
+    if (t.teamA && t.teamA !== "TBD") extra.add(t.teamA);
+    if (t.teamB && t.teamB !== "TBD") extra.add(t.teamB);
+  }
+  for (const r of Object.values(results.knockout)) {
+    if (r.winner) extra.add(r.winner);
+  }
+  const allTeams = [
+    ...ALL_TEAMS,
+    ...[...extra].filter((t) => !baseSet.has(t)),
+  ].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -56,6 +78,10 @@ export default async function AdminBracketPage({
       <BracketOverrideClient
         participantId={id}
         initialKnockout={initialKnockout}
+        initialClassification={initialClassification}
+        allTeams={allTeams}
+        knockoutTeams={results.knockoutTeams ?? {}}
+        knockoutResults={results.knockout}
       />
     </div>
   );

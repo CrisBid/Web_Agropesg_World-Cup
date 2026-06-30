@@ -16,10 +16,22 @@ model Participant {
   predictedChampion   String?
   predictedThirdPlace String?
 
-  groupPredictions    GroupPrediction[]
-  knockoutPredictions KnockoutPrediction[]
+  groupPredictions         GroupPrediction[]
+  knockoutPredictions      KnockoutPrediction[]
+  classificationOverrides  ClassificationOverride[]
 
   @@map("participants")
+}
+
+model ClassificationOverride {
+  participantId String
+  slot          String
+  team          String
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([participantId, slot])
+  @@map("classification_overrides")
 }
 
 model GroupPrediction {

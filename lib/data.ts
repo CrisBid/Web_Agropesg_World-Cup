@@ -69,10 +69,11 @@ export async function removeParticipant(id: string): Promise<void> {
 // ─── Predictions ────────────────────────────────────────────────────────────
 
 export async function getPredictions(participantId: string): Promise<ParticipantPredictions> {
-  const [participant, groupRows, knockoutRows] = await Promise.all([
+  const [participant, groupRows, knockoutRows, classificationRows] = await Promise.all([
     prisma.participant.findUnique({ where: { id: participantId } }),
     prisma.groupPrediction.findMany({ where: { participantId } }),
     prisma.knockoutPrediction.findMany({ where: { participantId } }),
+    prisma.classificationOverride.findMany({ where: { participantId } }),
   ]);
 
   const groups: ParticipantPredictions["groups"] = {};
@@ -85,11 +86,15 @@ export async function getPredictions(participantId: string): Promise<Participant
     knockout[r.gameId] = { winner: r.winner, scoreA: r.scoreA, scoreB: r.scoreB };
   }
 
+  const classificationOverride: Record<string, string> = {};
+  for (const r of classificationRows) classificationOverride[r.slot] = r.team;
+
   return {
     groups,
     knockout,
     champion: participant?.predictedChampion ?? null,
     thirdPlace: participant?.predictedThirdPlace ?? null,
+    ...(classificationRows.length > 0 ? { classificationOverride } : {}),
   };
 }
 

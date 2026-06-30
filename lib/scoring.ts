@@ -17,6 +17,8 @@ export interface ParticipantPredictions {
   knockout: Record<number, KnockoutPrediction>; // gameId → prediction
   champion: string | null;
   thirdPlace: string | null;
+  // Admin override: slot ("1A", "2B", "3rd_74" …) → team name
+  classificationOverride?: Record<string, string>;
 }
 
 export interface ActualResults {
@@ -166,14 +168,18 @@ export function calcTotalPoints(
     games.push({ gameId, points, breakdown });
   }
 
-  // Fase32 classifying: +3 pts per team the user predicted would qualify,
-  // derived from GROUP predictions (not from fase32 game picks).
+  // Fase32 classifying: +3 pts per team the user predicted would qualify.
+  // When an admin classificationOverride exists, use it; otherwise derive from group predictions.
   let classifyPts = 0;
   const allFase32Teams = new Set(
     Object.values(results.knockoutTeams ?? {}).flatMap((t) => [t.teamA, t.teamB]).filter((t) => t && t !== "TBD")
   );
   if (allFase32Teams.size > 0) {
-    for (const team of getPredictedFase32Qualifiers(predictions.groups)) {
+    const predictedQualifiers =
+      predictions.classificationOverride && Object.keys(predictions.classificationOverride).length > 0
+        ? Object.values(predictions.classificationOverride).filter((t): t is string => !!t)
+        : getPredictedFase32Qualifiers(predictions.groups);
+    for (const team of predictedQualifiers) {
       if (allFase32Teams.has(team)) { classifyPts += 3; total += 3; }
     }
   }
