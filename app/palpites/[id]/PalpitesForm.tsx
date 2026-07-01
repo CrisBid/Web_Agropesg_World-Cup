@@ -160,7 +160,7 @@ export default function PalpitesForm({ participantId, initialPredictions, result
     .slice(0, 8);
 
   function getWinnerOf(gameId: number): string {
-    return results.knockout[gameId]?.winner ?? predictions.knockout[gameId]?.winner ?? "TBD";
+    return predictions.knockout[gameId]?.winner ?? results.knockout[gameId]?.winner ?? "TBD";
   }
 
   function getTeamsForGame(gameId: number): { teamA: string; teamB: string } {
