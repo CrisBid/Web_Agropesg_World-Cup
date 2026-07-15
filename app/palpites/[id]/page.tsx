@@ -21,7 +21,7 @@ export default async function PalpitesPage({ params }: { params: Promise<{ id: s
   const { total, games: gamePoints, bonuses } = calcTotalPoints(predictions, results, gamesPhaseMap);
 
   const pointsByGame: Record<number, number> = {};
-  for (const gp of gamePoints) pointsByGame[gp.gameId] = gp.points;
+  for (const gp of gamePoints) pointsByGame[gp.gameId] = (pointsByGame[gp.gameId] ?? 0) + gp.points;
 
   const gamesPlayed = Object.keys(results.groups).length + Object.keys(results.knockout).length;
 
