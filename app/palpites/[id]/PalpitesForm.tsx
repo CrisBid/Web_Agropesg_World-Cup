@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, KNOCKOUT_GAME_PTS, BRACKET, FASE32_GROUPS, THIRD_PLACE_SLOTS } from "@/lib/games-data";
+import { GAMES, GROUPS, ALL_TEAMS, PHASE_LABELS, KNOCKOUT_GAME_PTS, PHASE_POINTS, BRACKET, FASE32_GROUPS, THIRD_PLACE_SLOTS } from "@/lib/games-data";
 import { ANNEX_C } from "@/lib/annex-c";
 import type { Phase, Game } from "@/lib/games-data";
 import type { ParticipantPredictions, ActualResults } from "@/lib/scoring";
@@ -761,6 +761,22 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                         ? `Vencedores dos jogos #${feeders[0]} e #${feeders[1]}`
                         : "";
 
+                      // Semis: two distinct scoring criteria — who reaches the final,
+                      // and who instead drops to the 3rd-place match.
+                      const isSemis = game.phase === "semis";
+                      const semisRealTeams = isSemis ? results.knockoutTeams?.[game.id] : null;
+                      const semisFinalCorrect =
+                        isSemis && played && !!result?.winner && !!pred.winner && pred.winner === result.winner;
+                      const semisPredictedLoser = isSemis && feeders
+                        ? feeders.map((f) => predictions.knockout[f]?.winner).find((w): w is string => !!w && w !== pred.winner)
+                        : undefined;
+                      const semisActualLoser =
+                        isSemis && played && result?.winner && semisRealTeams
+                          ? (semisRealTeams.teamA === result.winner ? semisRealTeams.teamB : semisRealTeams.teamA)
+                          : undefined;
+                      const semisTerceiroCorrect =
+                        isSemis && played && !!semisPredictedLoser && !!semisActualLoser && semisPredictedLoser === semisActualLoser;
+
                       return (
                         <div key={game.id}
                           style={{
@@ -775,7 +791,11 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                               style={{ color: "#1b4332" }}>{timeStr}</span>
                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
                               style={{ backgroundColor: "rgba(201,168,76,0.15)", color: "#8b7028" }}>
-                              +{PHASE_PTS[game.phase]} pts
+                              {game.phase === "terceiro"
+                                ? "Pontua via bônus 3º Colocado (+10)"
+                                : game.phase === "final"
+                                ? "Pontua via bônus Campeão (+15)"
+                                : `+${PHASE_PTS[game.phase]} pts`}
                             </span>
                             <span className="text-xs truncate hidden sm:block" style={{ color: "#8a8a8a" }}>
                               {game.stadium.split(",")[0]}
@@ -914,6 +934,29 @@ export default function PalpitesForm({ participantId, initialPredictions, result
                                       : ""}
                                     {result.winner} avançou
                                   </span>
+                                </div>
+                              )}
+
+                              {/* Semis: breakdown of the two separate scoring criteria */}
+                              {isSemis && played && (
+                                <div className="mt-2 pt-2 space-y-1"
+                                  style={{ borderTop: "1px solid rgba(27,67,50,0.08)" }}>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span style={{ color: semisFinalCorrect ? "#2d6a4f" : "#9a9a9a" }}>
+                                      {semisFinalCorrect ? "✓" : "✗"} Acertou quem avançou para a Final
+                                    </span>
+                                    <span className="font-bold" style={{ color: semisFinalCorrect ? "#2d6a4f" : "#9a9a9a" }}>
+                                      {semisFinalCorrect ? `+${PHASE_PTS.semis} pts` : "0 pts"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span style={{ color: semisTerceiroCorrect ? "#2d6a4f" : "#9a9a9a" }}>
+                                      {semisTerceiroCorrect ? "✓" : "✗"} Acertou quem foi para a disputa de 3º lugar
+                                    </span>
+                                    <span className="font-bold" style={{ color: semisTerceiroCorrect ? "#2d6a4f" : "#9a9a9a" }}>
+                                      {semisTerceiroCorrect ? `+${PHASE_POINTS.terceiro} pts` : "0 pts"}
+                                    </span>
+                                  </div>
                                 </div>
                               )}
                             </>
