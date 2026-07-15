@@ -266,6 +266,45 @@ export function calcTotalPoints(
     }
   }
 
+  // Semis → Terceiro: a semifinal's loser goes to the 3rd-place match, not the final.
+  // Award PHASE_POINTS.terceiro for each team the user predicted to lose its semi
+  // (i.e. predicted to reach "quartas" but not predicted to win the "semis") if that
+  // team actually ended up playing the 3rd-place decider.
+  const terceiroGameEntry = Object.entries(gamesPhaseMap).find(([, phase]) => phase === "terceiro");
+  if (terceiroGameEntry) {
+    const terceiroGameId = Number(terceiroGameEntry[0]);
+
+    const predictedQuartasWinners = new Set(
+      Object.entries(predictions.knockout)
+        .filter(([gameIdStr]) => gamesPhaseMap[Number(gameIdStr)] === "quartas")
+        .map(([, pred]) => pred.winner)
+        .filter((w): w is string => !!w)
+    );
+    const predictedSemisWinners = new Set(
+      Object.entries(predictions.knockout)
+        .filter(([gameIdStr]) => gamesPhaseMap[Number(gameIdStr)] === "semis")
+        .map(([, pred]) => pred.winner)
+        .filter((w): w is string => !!w)
+    );
+    const predictedTerceiroTeams = [...predictedQuartasWinners].filter((t) => !predictedSemisWinners.has(t));
+
+    const actualTerceiroTeams = results.knockoutTeams?.[terceiroGameId];
+    const actualTerceiroSet = new Set(
+      [actualTerceiroTeams?.teamA, actualTerceiroTeams?.teamB].filter((t): t is string => !!t && t !== "TBD")
+    );
+
+    for (const team of predictedTerceiroTeams) {
+      if (actualTerceiroSet.has(team)) {
+        total += PHASE_POINTS.terceiro;
+        games.push({
+          gameId: terceiroGameId,
+          points: PHASE_POINTS.terceiro,
+          breakdown: [`Time que foi para a disputa de 3º lugar (+${PHASE_POINTS.terceiro})`],
+        });
+      }
+    }
+  }
+
   // Bonuses
   let champion = 0;
   let thirdPlace = 0;
